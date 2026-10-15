@@ -26,6 +26,9 @@ include = ["binance_connector*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Put the project root on sys.path so tests can import shared constants
+# with `from tests.conftest import ...`.
+pythonpath = ["."]
 # importlib mode lets test modules in different folders share a file name
 # without needing __init__.py files.
 # E2E tests place real orders on the Demo account, so they are opt-in:
