@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "binance-connector"
+version = "0.1.0"
+description = "Flask microservice that opens and closes Binance USD-M futures positions on the Demo Trading REST API."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "flask>=3.1,<4",
+    "requests>=2.32,<3",
+    "pydantic>=2.11,<3",
+    "python-dotenv>=1.1,<2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4,<9",
+    "responses>=0.25,<1",
+]
+
+[tool.setuptools.packages.find]
+include = ["binance_connector*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# importlib mode lets test modules in different folders share a file name
+# without needing __init__.py files.
+# E2E tests place real orders on the Demo account, so they are opt-in:
+# run them with `pytest -m e2e` (a later -m on the command line overrides this one).
+addopts = "--import-mode=importlib -m \"not e2e\""
+markers = [
+    "e2e: end-to-end tests against the real Binance Futures Demo API (need keys in .env)",
+]
