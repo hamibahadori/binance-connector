@@ -59,6 +59,17 @@ class NoOpenPositionError(BinanceConnectorError):
         self.symbol = symbol
 
 
+class HedgeModeNotSupportedError(BinanceConnectorError):
+    """The account holds hedge-mode (LONG/SHORT) positions; only one-way mode is supported."""
+
+    def __init__(self, symbol: str) -> None:
+        super().__init__(
+            f"The account holds hedge-mode positions for {symbol}. "
+            "This service supports one-way position mode only."
+        )
+        self.symbol = symbol
+
+
 class CloseQuantityExceedsPositionError(BinanceConnectorError):
     """A partial close asked for more than the open position holds."""
 
