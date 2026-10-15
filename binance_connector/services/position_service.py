@@ -11,8 +11,13 @@ Rules this module enforces:
 * **Every order has a client order id.** It comes from the caller or is
   generated here, and it is reported back even when the outcome is unknown, so
   the caller can reconcile instead of blindly retrying.
+* **The average fill price is best effort.** Binance's order reply has no
+  ``avgPrice``, so it is looked up afterwards by client order id. If that lookup
+  fails, the order has still happened: the result reports the price as unknown
+  (``None``) rather than turning a successful trade into an error.
 """
 
+import logging
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -21,6 +26,7 @@ from enum import StrEnum
 from typing import Any, Protocol
 
 from binance_connector.errors import (
+    BinanceError,
     BinanceUnknownOutcomeError,
     CloseQuantityExceedsPositionError,
     HedgeModeNotSupportedError,
@@ -29,6 +35,8 @@ from binance_connector.errors import (
 
 ONE_WAY_POSITION_SIDE = "BOTH"
 """Binance's ``positionSide`` for a one-way-mode position."""
+
+logger = logging.getLogger(__name__)
 
 
 class PositionDirection(StrEnum):
@@ -78,6 +86,7 @@ class OrderResult:
 
     ``direction`` is the direction of the position that was opened or closed.
     ``side`` is the order side actually sent to Binance.
+    ``average_price`` is ``None`` when Binance could not tell us the fill price.
     """
 
     symbol: str
@@ -88,7 +97,7 @@ class OrderResult:
     status: str
     requested_quantity: Decimal
     executed_quantity: Decimal
-    average_price: Decimal
+    average_price: Decimal | None
     leverage: int | None = None
 
 
@@ -106,6 +115,8 @@ class FuturesClient(Protocol):
         client_order_id: str,
         reduce_only: bool = False,
     ) -> dict[str, Any]: ...
+
+    def get_order(self, *, symbol: str, client_order_id: str) -> dict[str, Any]: ...
 
     def get_position_risk(self, *, symbol: str) -> list[dict[str, Any]]: ...
 
@@ -153,7 +164,13 @@ class PositionService:
             client_order_id=client_order_id,
             reduce_only=False,
         )
-        return _order_result(order_response, command.direction, command.quantity, command.leverage)
+        return _order_result(
+            order_response,
+            command.direction,
+            command.quantity,
+            self._average_fill_price(order_response),
+            command.leverage,
+        )
 
     def close_position(self, command: ClosePositionCommand) -> OrderResult:
         """Read the open position, then reduce it with an opposite-side MARKET order.
@@ -179,7 +196,13 @@ class PositionService:
             client_order_id=command.client_order_id or self.generate_client_order_id(),
             reduce_only=True,
         )
-        return _order_result(order_response, direction, close_quantity, leverage=None)
+        return _order_result(
+            order_response,
+            direction,
+            close_quantity,
+            self._average_fill_price(order_response),
+            leverage=None,
+        )
 
     def _read_net_position(self, symbol: str) -> Decimal:
         """Return the signed one-way position amount for ``symbol``; never zero.
@@ -207,16 +230,45 @@ class PositionService:
             error.client_order_id = client_order_id
             raise
 
+    def _average_fill_price(self, order_response: dict[str, Any]) -> Decimal | None:
+        """The order's average fill price, or None when Binance cannot tell us.
+
+        Uses ``avgPrice`` from the order reply when present. Binance's real reply
+        has none, so normally one extra lookup by client order id is made. The
+        order has already been placed by then, so a failed lookup is logged and
+        reported as an unknown price, never raised. A zero price means "not
+        filled yet", which is also reported as unknown.
+        """
+        raw_average_price = order_response.get("avgPrice")
+        if raw_average_price is None:
+            try:
+                order_details = self._client.get_order(
+                    symbol=order_response["symbol"], client_order_id=order_response["clientOrderId"]
+                )
+            except BinanceError as error:
+                logger.warning(
+                    "Order %s placed, but its average price could not be read: %s",
+                    order_response["clientOrderId"],
+                    error,
+                )
+                return None
+            raw_average_price = order_details.get("avgPrice")
+
+        if raw_average_price is None or Decimal(raw_average_price) == 0:
+            return None
+        return Decimal(raw_average_price)
+
 
 def _order_result(
     order_response: dict[str, Any],
     direction: PositionDirection,
     requested_quantity: Decimal,
+    average_price: Decimal | None,
     leverage: int | None,
 ) -> OrderResult:
-    """Combine Binance's order reply with what the service knows (direction, request, leverage).
+    """Combine Binance's order reply with what the service knows (direction, request, price, leverage).
 
-    Binance sends quantities and prices as strings; they become Decimals here.
+    Binance sends quantities as strings; they become Decimals here.
     """
     return OrderResult(
         symbol=order_response["symbol"],
@@ -227,6 +279,6 @@ def _order_result(
         status=order_response["status"],
         requested_quantity=requested_quantity,
         executed_quantity=Decimal(order_response["executedQty"]),
-        average_price=Decimal(order_response["avgPrice"]),
+        average_price=average_price,
         leverage=leverage,
     )

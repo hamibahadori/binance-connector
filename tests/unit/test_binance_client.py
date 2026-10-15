@@ -27,15 +27,16 @@ ORDER_URL = f"{DEMO_BASE_URL}/fapi/v1/order"
 LEVERAGE_URL = f"{DEMO_BASE_URL}/fapi/v1/leverage"
 POSITION_RISK_URL = f"{DEMO_BASE_URL}/fapi/v3/positionRisk"
 
+# Shape of a real Demo reply to POST /fapi/v1/order (captured 2026-10-16): no avgPrice.
 ORDER_RESPONSE = {
     "orderId": 4000000001,
     "symbol": "BTCUSDT",
     "status": "FILLED",
     "clientOrderId": "order-123",
     "side": "BUY",
-    "origQty": "0.002",
-    "executedQty": "0.002",
-    "avgPrice": "65000.10",
+    "origQty": "0.0020",
+    "executedQty": "0.0020",
+    "cumQty": "0.0020",
 }
 
 
@@ -125,6 +126,24 @@ def test_change_leverage_sends_symbol_and_leverage(client):
     )
     assert signature == sign_query(unsigned_query, TEST_API_SECRET)
     assert result == {"symbol": "BTCUSDT", "leverage": 10}
+
+
+@responses.activate
+def test_get_order_looks_up_by_client_order_id(client):
+    order_details = {"symbol": "BTCUSDT", "clientOrderId": "order-123", "avgPrice": "82206.60"}
+    responses.get(ORDER_URL, json=order_details)
+
+    result = client.get_order(symbol="BTCUSDT", client_order_id="order-123")
+
+    sent_request = responses.calls[0].request
+    unsigned_query, signature = split_signed_query(sent_request.url)
+    assert sent_request.method == "GET"
+    assert unsigned_query == (
+        "symbol=BTCUSDT&origClientOrderId=order-123"
+        f"&recvWindow=5000&timestamp={FIXED_TIMESTAMP_MS}"
+    )
+    assert signature == sign_query(unsigned_query, TEST_API_SECRET)
+    assert result == order_details
 
 
 @responses.activate

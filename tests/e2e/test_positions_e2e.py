@@ -19,7 +19,9 @@ from tests.e2e.conftest import read_position_amount, wait_for_position_amount
 
 pytestmark = pytest.mark.e2e
 
-REQUEST_TIMEOUT_SECONDS = 30
+# One open can make three Binance calls (leverage, order, price lookup), each up to
+# BINANCE_TIMEOUT_SECONDS, so the caller must wait longer than any single call.
+REQUEST_TIMEOUT_SECONDS = 120
 
 
 def unique_client_order_id(label: str) -> str:

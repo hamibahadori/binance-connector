@@ -11,6 +11,8 @@ from typing import Any
 import pytest
 
 from binance_connector.errors import (
+    BinanceAPIError,
+    BinanceUnavailableError,
     BinanceUnknownOutcomeError,
     CloseQuantityExceedsPositionError,
     HedgeModeNotSupportedError,
@@ -27,15 +29,26 @@ GENERATED_CLIENT_ORDER_ID = "generated-id"
 
 
 class FakeFuturesClient:
-    """Stands in for BinanceFuturesClient and records what the service asks of it."""
+    """Stands in for BinanceFuturesClient and records what the service asks of it.
+
+    By default the order reply has **no** ``avgPrice``, which is what Binance Demo
+    actually sends (captured 2026-10-16), and the follow-up order lookup reports
+    ``LOOKUP_AVERAGE_PRICE``.
+    """
 
     def __init__(
         self,
         position_entries: list[dict[str, Any]] | None = None,
         order_error: Exception | None = None,
+        reply_average_price: str | None = None,
+        lookup_average_price: str = "65000.10",
+        lookup_error: Exception | None = None,
     ) -> None:
         self.position_entries = position_entries or []
         self.order_error = order_error
+        self.reply_average_price = reply_average_price
+        self.lookup_average_price = lookup_average_price
+        self.lookup_error = lookup_error
         self.calls: list[tuple[str, dict[str, Any]]] = []
 
     def change_leverage(self, *, symbol: str, leverage: int) -> dict[str, Any]:
@@ -47,7 +60,7 @@ class FakeFuturesClient:
         if self.order_error is not None:
             raise self.order_error
         quantity_text = format(order_arguments["quantity"], "f")
-        return {
+        order_reply = {
             "orderId": 4000000001,
             "symbol": order_arguments["symbol"],
             "status": "FILLED",
@@ -55,8 +68,17 @@ class FakeFuturesClient:
             "side": order_arguments["side"],
             "origQty": quantity_text,
             "executedQty": quantity_text,
-            "avgPrice": "65000.10",
+            "cumQty": quantity_text,
         }
+        if self.reply_average_price is not None:
+            order_reply["avgPrice"] = self.reply_average_price
+        return order_reply
+
+    def get_order(self, *, symbol: str, client_order_id: str) -> dict[str, Any]:
+        self.calls.append(("get_order", {"symbol": symbol, "client_order_id": client_order_id}))
+        if self.lookup_error is not None:
+            raise self.lookup_error
+        return {"symbol": symbol, "clientOrderId": client_order_id, "avgPrice": self.lookup_average_price}
 
     def get_position_risk(self, *, symbol: str) -> list[dict[str, Any]]:
         self.calls.append(("get_position_risk", {"symbol": symbol}))
@@ -114,7 +136,7 @@ def test_open_sets_leverage_before_placing_the_order():
         )
     )
 
-    assert fake_client.call_names() == ["change_leverage", "place_market_order"]
+    assert fake_client.call_names() == ["change_leverage", "place_market_order", "get_order"]
     assert fake_client.calls[0][1] == {"symbol": "BTCUSDT", "leverage": 10}
     assert result.leverage == 10
 
@@ -126,7 +148,7 @@ def test_open_without_leverage_leaves_leverage_untouched():
         OpenPositionCommand(symbol="BTCUSDT", direction=PositionDirection.LONG, quantity=Decimal("0.002"))
     )
 
-    assert fake_client.call_names() == ["place_market_order"]
+    assert fake_client.call_names() == ["place_market_order", "get_order"]
     assert result.leverage is None
 
 
@@ -190,7 +212,7 @@ def test_close_without_quantity_closes_the_whole_position(
 
     result = make_service(fake_client).close_position(ClosePositionCommand(symbol="BTCUSDT"))
 
-    assert fake_client.call_names() == ["get_position_risk", "place_market_order"]
+    assert fake_client.call_names() == ["get_position_risk", "place_market_order", "get_order"]
     assert fake_client.order_arguments() == {
         "symbol": "BTCUSDT",
         "side": expected_side,
@@ -273,6 +295,65 @@ def test_close_with_unknown_outcome_reports_the_client_order_id():
         make_service(fake_client).close_position(ClosePositionCommand(symbol="BTCUSDT"))
 
     assert raised.value.client_order_id == GENERATED_CLIENT_ORDER_ID
+
+
+# --- average fill price -----------------------------------------------------
+
+
+def test_average_price_is_looked_up_by_client_order_id_when_the_reply_lacks_it():
+    fake_client = FakeFuturesClient(lookup_average_price="82206.60")
+
+    result = make_service(fake_client).open_position(
+        OpenPositionCommand(symbol="BTCUSDT", direction=PositionDirection.LONG, quantity=Decimal("0.002"))
+    )
+
+    assert fake_client.calls[-1] == (
+        "get_order",
+        {"symbol": "BTCUSDT", "client_order_id": GENERATED_CLIENT_ORDER_ID},
+    )
+    assert result.average_price == Decimal("82206.60")
+
+
+def test_average_price_in_the_reply_is_used_without_a_lookup():
+    fake_client = FakeFuturesClient(reply_average_price="65000.10")
+
+    result = make_service(fake_client).open_position(
+        OpenPositionCommand(symbol="BTCUSDT", direction=PositionDirection.LONG, quantity=Decimal("0.002"))
+    )
+
+    assert "get_order" not in fake_client.call_names()
+    assert result.average_price == Decimal("65000.10")
+
+
+@pytest.mark.parametrize(
+    "lookup_error",
+    [
+        BinanceAPIError(400, -2013, "Order does not exist."),
+        BinanceUnavailableError("no connection"),
+        BinanceUnknownOutcomeError("timed out"),
+    ],
+    ids=["rejected", "unavailable", "unknown"],
+)
+def test_failed_lookup_leaves_average_price_unknown_but_the_order_stands(lookup_error):
+    fake_client = FakeFuturesClient(
+        position_entries=[one_way_position("0.005")], lookup_error=lookup_error
+    )
+
+    result = make_service(fake_client).close_position(ClosePositionCommand(symbol="BTCUSDT"))
+
+    assert result.status == "FILLED"
+    assert result.average_price is None
+
+
+@pytest.mark.parametrize("zero_price", ["0", "0.00000"])
+def test_zero_average_price_from_the_lookup_is_reported_as_unknown(zero_price):
+    fake_client = FakeFuturesClient(lookup_average_price=zero_price)
+
+    result = make_service(fake_client).open_position(
+        OpenPositionCommand(symbol="BTCUSDT", direction=PositionDirection.LONG, quantity=Decimal("0.002"))
+    )
+
+    assert result.average_price is None
 
 
 def test_generated_client_order_ids_are_unique_and_fit_binance_rules():

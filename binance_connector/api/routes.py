@@ -67,7 +67,10 @@ def _position_service() -> PositionService:
 
 
 def _serialise_order_result(result: OrderResult) -> dict[str, Any]:
-    """Convert to JSON-safe values. Decimals become strings so no precision is lost."""
+    """Convert to JSON-safe values. Decimals become strings so no precision is lost.
+
+    ``average_price`` is ``null`` when the fill price could not be read from Binance.
+    """
     return {
         "symbol": result.symbol,
         "direction": result.direction.value,
@@ -77,6 +80,6 @@ def _serialise_order_result(result: OrderResult) -> dict[str, Any]:
         "status": result.status,
         "requested_quantity": format(result.requested_quantity, "f"),
         "executed_quantity": format(result.executed_quantity, "f"),
-        "average_price": format(result.average_price, "f"),
+        "average_price": None if result.average_price is None else format(result.average_price, "f"),
         "leverage": result.leverage,
     }

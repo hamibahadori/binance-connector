@@ -1,9 +1,10 @@
 """HTTP client for the Binance USD-M Futures REST API.
 
-Only the three signed endpoints this service needs are implemented:
+Only the signed endpoints this service needs are implemented:
 
 * ``POST /fapi/v1/leverage``     change a symbol's initial leverage
 * ``POST /fapi/v1/order``        place a MARKET order
+* ``GET  /fapi/v1/order``        look up an order (used for its average fill price)
 * ``GET  /fapi/v3/positionRisk`` read the current position for a symbol
 
 Every parameter, including ``signature``, goes in the query string. Binance
@@ -87,8 +88,9 @@ class BinanceFuturesClient:
     ) -> dict[str, Any]:
         """Place a MARKET order and return Binance's order response.
 
-        ``newOrderRespType=RESULT`` makes Binance reply with the final fill
-        (``status``, ``executedQty``, ``avgPrice``) instead of an acknowledgement.
+        ``newOrderRespType=RESULT`` makes Binance reply with the final ``status`` and
+        ``executedQty`` instead of an acknowledgement. The reply does **not** include
+        ``avgPrice`` (verified on Demo, 2026-10-16); use ``get_order`` for that.
         ``reduce_only`` stops the order from ever increasing or flipping a position.
         """
         parameters = [
@@ -104,6 +106,14 @@ class BinanceFuturesClient:
             ("newOrderRespType", "RESULT"),
         ]
         return self._send_signed("POST", "/fapi/v1/order", parameters)
+
+    def get_order(self, *, symbol: str, client_order_id: str) -> dict[str, Any]:
+        """Return Binance's record of an order, including ``avgPrice``, found by our client order id."""
+        return self._send_signed(
+            "GET",
+            "/fapi/v1/order",
+            [("symbol", symbol), ("origClientOrderId", client_order_id)],
+        )
 
     def get_position_risk(self, *, symbol: str) -> list[dict[str, Any]]:
         """Return the position entries for ``symbol`` (empty when there is nothing open)."""

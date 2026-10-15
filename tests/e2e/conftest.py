@@ -32,7 +32,9 @@ from binance_connector.errors import ConfigurationError
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ENV_FILE = PROJECT_ROOT / ".env"
 
-POSITION_POLL_TIMEOUT_SECONDS = 10.0
+# Generous because a single Binance round trip has been measured at up to ~23 s
+# on a slow connection.
+POSITION_POLL_TIMEOUT_SECONDS = 30.0
 POSITION_POLL_INTERVAL_SECONDS = 0.5
 
 

@@ -106,6 +106,22 @@ Settings come from environment variables. On startup, `.env` in the current work
 | `E2E_SYMBOL` | no | `BTCUSDT` | E2E tests only: symbol to trade |
 | `E2E_QUANTITY` | no | `0.002` | E2E tests only: order size; must reach the symbol's minimum order value (about 100 USDT on BTCUSDT) |
 
+### Slow networks
+
+The defaults (`recvWindow` 5000 ms, timeout 10 s) follow Binance's recommendation and suit a normal connection. If requests to Binance are slow from your machine, you will see two symptoms:
+
+- `binance_rejected` with code **`-1021`** ("Timestamp for this request is outside of the recvWindow"). Requests are arriving too long after they were signed.
+- **`504 binance_outcome_unknown`** caused by timeouts.
+
+Measure the round trip, then raise both values in `.env`. For example, on a link with multi-second round trips:
+
+```
+BINANCE_RECV_WINDOW_MS=20000
+BINANCE_TIMEOUT_SECONDS=30
+```
+
+The trade-off: with a larger `recvWindow`, a delayed market order can still execute that much later, at whatever the price is by then.
+
 ---
 
 ## API reference
@@ -180,8 +196,12 @@ Unknown fields are rejected, so a misspelling like `levrage` fails loudly instea
 | `status` | Binance order status, normally `FILLED` for a market order |
 | `requested_quantity` | Quantity asked for |
 | `executed_quantity` | Quantity Binance filled |
-| `average_price` | Average fill price |
+| `average_price` | Average fill price, or `null` if it couldn't be read (see below) |
 | `leverage` | Leverage applied by this call, or `null` if none was requested |
+
+**About `average_price`.** Binance's reply to a new order doesn't include the fill price, so the service looks the order up once it has filled (`GET /fapi/v1/order` by `client_order_id`).
+
+If that lookup fails, **the order has still been placed**. The service then returns `200` with `"average_price": null` rather than reporting an error for a trade that happened. A caller that needs the price can look the order up later by `client_order_id`.
 
 ### POST /api/v1/positions/close
 
@@ -317,7 +337,7 @@ def close_position(symbol: str, quantity: str | None = None) -> dict:
     return response.json()
 ```
 
-Use a client timeout longer than `BINANCE_TIMEOUT_SECONDS`. An open with leverage makes two Binance calls, so allow at least twice that.
+Use a client timeout well above `BINANCE_TIMEOUT_SECONDS`. An open with leverage makes up to three Binance calls (leverage, order, price lookup), so allow at least three times that.
 
 ---
 
@@ -338,6 +358,7 @@ Dependencies only point downwards: api → services → binance. The service lay
 |---|---|
 | Set leverage | `POST /fapi/v1/leverage` |
 | Place a market order | `POST /fapi/v1/order` (`type=MARKET`, `newOrderRespType=RESULT`, `reduceOnly` on close) |
+| Read the order's average fill price | `GET /fapi/v1/order` (by `origClientOrderId`) |
 | Read the position | `GET /fapi/v3/positionRisk` |
 
 **Signing.** Each request gets `timestamp` and `recvWindow`. Then the exact URL-encoded parameter string is signed with HMAC-SHA256 using the API secret, and sent with the API key in the `X-MBX-APIKEY` header. All parameters go in the query string, so the string that is signed is byte-for-byte the string that is sent. Reference: [Binance USD-M Futures general info](https://developers.binance.com/docs/derivatives/usds-margined-futures/general-info).
@@ -427,6 +448,6 @@ These are deliberate, to keep the service small. Each could be added later.
 | Hedge mode | One-way mode only. Close returns `409 hedge_mode_not_supported` in hedge mode. |
 | Limit, stop-loss and take-profit orders | Market orders only. Binance moved stop/TP orders to separate Algo endpoints (`/fapi/v1/algoOrder`) in December 2025. |
 | Margin type (isolated/cross) | The account's current setting applies. |
-| Clock sync with Binance | Uses the local clock. Keep the machine's clock synced, or Binance returns `-1021`. |
+| Clock sync with Binance | Uses the local clock. Keep the machine's clock synced, or Binance returns `-1021`. Slow networks cause `-1021` too; see [Slow networks](#slow-networks). |
 | Production web server | `flask run` is a development server. Use a WSGI server such as waitress for anything long-running. |
 | Live (real-money) trading | Built and tested for Demo only. |

@@ -20,7 +20,7 @@ BINANCE_POSITION_RISK_URL = f"{DEMO_BASE_URL}/fapi/v3/positionRisk"
 
 
 def binance_order_reply(side: str, quantity: str, client_order_id: str) -> dict:
-    """A FILLED reply in the shape Binance sends for newOrderRespType=RESULT."""
+    """A FILLED reply in the shape Binance Demo really sends: note there is no avgPrice."""
     return {
         "orderId": 4000000001,
         "symbol": "BTCUSDT",
@@ -29,8 +29,13 @@ def binance_order_reply(side: str, quantity: str, client_order_id: str) -> dict:
         "side": side,
         "origQty": quantity,
         "executedQty": quantity,
-        "avgPrice": "65000.10",
+        "cumQty": quantity,
     }
+
+
+def register_order_lookup(binance, average_price: str = "65000.10") -> None:
+    """Mock the follow-up GET /fapi/v1/order the service makes to learn the fill price."""
+    binance.get(BINANCE_ORDER_URL, json={"symbol": "BTCUSDT", "status": "FILLED", "avgPrice": average_price})
 
 
 def sent_parameters(mocked_call) -> dict[str, str]:
@@ -54,6 +59,7 @@ def test_health_reports_ok_without_calling_binance(http_client, binance):
 
 def test_open_long_places_a_buy_market_order(http_client, binance):
     binance.post(BINANCE_ORDER_URL, json=binance_order_reply("BUY", "0.002", "open-1"))
+    register_order_lookup(binance)
 
     response = http_client.post(
         OPEN_URL,
@@ -83,6 +89,7 @@ def test_open_long_places_a_buy_market_order(http_client, binance):
 def test_open_short_with_leverage_sets_leverage_then_sells(http_client, binance):
     binance.post(BINANCE_LEVERAGE_URL, json={"symbol": "BTCUSDT", "leverage": 5})
     binance.post(BINANCE_ORDER_URL, json=binance_order_reply("SELL", "0.002", "open-2"))
+    register_order_lookup(binance)
 
     response = http_client.post(
         OPEN_URL,
@@ -98,9 +105,12 @@ def test_open_short_with_leverage_sets_leverage_then_sells(http_client, binance)
     assert response.status_code == 200
     assert response.get_json()["leverage"] == 5
     assert response.get_json()["direction"] == "SHORT"
-    assert [mocked_call.request.url.split("?")[0] for mocked_call in binance.calls] == [
-        BINANCE_LEVERAGE_URL,
-        BINANCE_ORDER_URL,
+    assert [
+        (mocked_call.request.method, mocked_call.request.url.split("?")[0]) for mocked_call in binance.calls
+    ] == [
+        ("POST", BINANCE_LEVERAGE_URL),
+        ("POST", BINANCE_ORDER_URL),
+        ("GET", BINANCE_ORDER_URL),
     ]
     assert sent_parameters(binance.calls[0])["leverage"] == "5"
     assert sent_parameters(binance.calls[1])["symbol"] == "BTCUSDT"
@@ -109,10 +119,25 @@ def test_open_short_with_leverage_sets_leverage_then_sells(http_client, binance)
 
 def test_open_generates_a_client_order_id_when_none_is_given(http_client, binance):
     binance.post(BINANCE_ORDER_URL, json=binance_order_reply("BUY", "0.002", "echoed"))
+    register_order_lookup(binance)
 
     http_client.post(OPEN_URL, json={"symbol": "BTCUSDT", "direction": "LONG", "quantity": "0.002"})
 
     assert sent_parameters(binance.calls[0])["newClientOrderId"].startswith("lx-")
+
+
+def test_open_succeeds_with_null_average_price_when_the_lookup_fails(http_client, binance):
+    binance.post(BINANCE_ORDER_URL, json=binance_order_reply("BUY", "0.002", "open-3"))
+    binance.get(BINANCE_ORDER_URL, status=503, json={"code": -1000, "msg": "Unknown error"})
+
+    response = http_client.post(
+        OPEN_URL,
+        json={"symbol": "BTCUSDT", "direction": "LONG", "quantity": "0.002", "client_order_id": "open-3"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["status"] == "FILLED"
+    assert response.get_json()["average_price"] is None
 
 
 # --- open: bad requests -----------------------------------------------------
@@ -203,6 +228,7 @@ def test_close_long_sells_the_whole_position_reduce_only(http_client, binance):
         json=[{"symbol": "BTCUSDT", "positionSide": "BOTH", "positionAmt": "0.005"}],
     )
     binance.post(BINANCE_ORDER_URL, json=binance_order_reply("SELL", "0.005", "close-1"))
+    register_order_lookup(binance)
 
     response = http_client.post(CLOSE_URL, json={"symbol": "BTCUSDT", "client_order_id": "close-1"})
 
@@ -223,6 +249,7 @@ def test_partial_close_of_a_short_buys_the_requested_quantity(http_client, binan
         json=[{"symbol": "BTCUSDT", "positionSide": "BOTH", "positionAmt": "-0.005"}],
     )
     binance.post(BINANCE_ORDER_URL, json=binance_order_reply("BUY", "0.002", "close-2"))
+    register_order_lookup(binance)
 
     response = http_client.post(CLOSE_URL, json={"symbol": "BTCUSDT", "quantity": "0.002"})
 
