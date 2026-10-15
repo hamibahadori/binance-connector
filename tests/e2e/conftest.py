@@ -68,7 +68,11 @@ def e2e_symbol(e2e_environment) -> str:
 
 @pytest.fixture(scope="session")
 def e2e_quantity(e2e_environment) -> Decimal:
-    """Order size for the tests. It must clear Binance's minimum notional (about 100 USDT)."""
+    """Order size for the tests.
+
+    Opening orders must reach the symbol's minimum notional (about 100 USDT on
+    BTCUSDT). Closing orders are reduce-only, which Binance exempts from it.
+    """
     return Decimal(e2e_environment.get("E2E_QUANTITY", "0.002"))
 
 

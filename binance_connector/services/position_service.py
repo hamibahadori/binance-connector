@@ -214,6 +214,10 @@ def _order_result(
     requested_quantity: Decimal,
     leverage: int | None,
 ) -> OrderResult:
+    """Combine Binance's order reply with what the service knows (direction, request, leverage).
+
+    Binance sends quantities and prices as strings; they become Decimals here.
+    """
     return OrderResult(
         symbol=order_response["symbol"],
         direction=direction,

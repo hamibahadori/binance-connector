@@ -54,6 +54,7 @@ class OpenPositionRequest(_RequestBody):
     _normalise_text = field_validator("symbol", "direction", mode="before")(_upper_case_text)
 
     def to_command(self) -> OpenPositionCommand:
+        """Hand the validated values to the service layer, which knows nothing about HTTP."""
         return OpenPositionCommand(
             symbol=self.symbol,
             direction=self.direction,
@@ -73,6 +74,7 @@ class ClosePositionRequest(_RequestBody):
     _normalise_text = field_validator("symbol", mode="before")(_upper_case_text)
 
     def to_command(self) -> ClosePositionCommand:
+        """Hand the validated values to the service layer, which knows nothing about HTTP."""
         return ClosePositionCommand(
             symbol=self.symbol,
             quantity=self.quantity,

@@ -51,6 +51,7 @@ class Settings:
 
 
 def _read_required(environment: Mapping[str, str], variable: str) -> str:
+    """Return the trimmed value of ``variable``; missing or blank is a ConfigurationError."""
     value = environment.get(variable, "").strip()
     if not value:
         raise ConfigurationError(f"{variable} is not set. Copy .env.example to .env and fill it in.")
@@ -58,6 +59,7 @@ def _read_required(environment: Mapping[str, str], variable: str) -> str:
 
 
 def _read_recv_window(environment: Mapping[str, str]) -> int:
+    """Read BINANCE_RECV_WINDOW_MS: a whole number of ms within Binance's 1..60000 limit."""
     variable = "BINANCE_RECV_WINDOW_MS"
     raw_value = environment.get(variable, str(DEFAULT_RECV_WINDOW_MS))
     try:
@@ -72,6 +74,7 @@ def _read_recv_window(environment: Mapping[str, str]) -> int:
 
 
 def _read_timeout(environment: Mapping[str, str]) -> float:
+    """Read BINANCE_TIMEOUT_SECONDS: a positive number of seconds."""
     variable = "BINANCE_TIMEOUT_SECONDS"
     raw_value = environment.get(variable, str(DEFAULT_TIMEOUT_SECONDS))
     try:

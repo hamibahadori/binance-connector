@@ -51,6 +51,7 @@ def register_error_handlers(app: Flask) -> None:
 
 
 def _error_response(status: int, error_code: str, message: str, **extra_fields: object) -> tuple[Response, int]:
+    """Build the standard error body ``{"error", "message", **extra_fields}`` with ``status``."""
     return jsonify(error=error_code, message=message, **extra_fields), status
 
 
@@ -59,6 +60,11 @@ def _invalid_request_body(error: InvalidRequestBodyError) -> tuple[Response, int
 
 
 def _validation_error(error: ValidationError) -> tuple[Response, int]:
+    """List every invalid field as ``{"field": "quantity", "message": "..."}``.
+
+    A nested location such as ``("leverage", "int")`` is joined with dots; a
+    whole-body error with no location is reported as field ``"body"``.
+    """
     details = [
         {
             "field": ".".join(str(location_part) for location_part in field_error["loc"]) or "body",
@@ -115,6 +121,10 @@ def _binance_outcome_unknown(error: BinanceUnknownOutcomeError) -> tuple[Respons
 
 
 def _http_exception(error: HTTPException) -> Response:
+    """Render Flask/werkzeug errors (404, 405, ...) as JSON, e.g. "Not Found" -> ``not_found``.
+
+    A 405 keeps its ``Allow`` header so callers can see which methods are valid.
+    """
     error_code = (error.name or "http_error").lower().replace(" ", "_")
     response = jsonify(error=error_code, message=error.description)
     response.status_code = error.code or 500
@@ -124,5 +134,6 @@ def _http_exception(error: HTTPException) -> Response:
 
 
 def _unexpected_error(error: Exception) -> tuple[Response, int]:
+    """Log the full traceback, but never send internals (stack traces, values) to the caller."""
     logger.exception("Unhandled error while serving a request")
     return _error_response(500, "internal_error", "An unexpected error occurred. See the service logs.")

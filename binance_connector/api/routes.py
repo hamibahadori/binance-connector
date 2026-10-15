@@ -50,6 +50,11 @@ def close_position() -> ResponseReturnValue:
 
 
 def _json_object_body() -> dict[str, Any]:
+    """Return the request body as a dict, or raise InvalidRequestBodyError.
+
+    ``silent=True`` makes malformed JSON and non-JSON content types return None
+    instead of Flask's HTML 400 page, so every error stays JSON.
+    """
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
         raise InvalidRequestBodyError("The request body must be a JSON object.")
@@ -57,6 +62,7 @@ def _json_object_body() -> dict[str, Any]:
 
 
 def _position_service() -> PositionService:
+    """The PositionService that ``create_app`` attached to the current app."""
     return current_app.extensions[POSITION_SERVICE_KEY]
 
 
