@@ -243,10 +243,24 @@ class TradeRepository:
 
         return self._write(trade_id, change)
 
-    def update_fields(self, trade_id: str, event_detail: dict[str, Any] | None = None, **field_updates: Any) -> Trade:
-        """Set fields without a state change (e.g. an algo order's status). Recorded as an event."""
+    def update_fields(
+        self,
+        trade_id: str,
+        event_detail: dict[str, Any] | None = None,
+        only_if_unset: tuple[str, ...] = (),
+        **field_updates: Any,
+    ) -> Trade:
+        """Set fields without a state change (e.g. an algo order's status). Recorded as an event.
+
+        Fields named in ``only_if_unset`` are written only while still NULL. The API uses
+        this when it records "TP placed, status NEW": if the worker already recorded a later
+        status (the TP filled in the meantime), that later status must win.
+        """
 
         def change(record: TradeRecord) -> TradeEventRecord:
+            for field_name in only_if_unset:
+                if getattr(record, field_name) is not None:
+                    field_updates.pop(field_name, None)
             _apply_fields(record, field_updates)
             detail = {"fields": field_updates, **(event_detail or {})}
             return _event_record(trade_id, self._clock(), "FIELDS_UPDATED", None, None, detail)

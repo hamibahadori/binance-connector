@@ -34,8 +34,8 @@ def session_factory(database_engine):
 
 
 @pytest.fixture
-def settings() -> Settings:
-    """Settings with fake credentials, pointing at the Demo base URL.
+def settings(database_url) -> Settings:
+    """Settings with fake credentials, the Demo base URL, and a fresh migrated database.
 
     Unit and functional tests intercept every HTTP call with ``responses``,
     so these credentials never reach Binance.
@@ -46,4 +46,6 @@ def settings() -> Settings:
         base_url=DEMO_BASE_URL,
         recv_window_ms=5000,
         timeout_seconds=10.0,
+        database_url=database_url,
+        trigger_price_type="MARK_PRICE",
     )

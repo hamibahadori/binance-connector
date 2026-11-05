@@ -7,14 +7,19 @@ Some errors add fields; see the README's error table.
 |------------------------------------|------|-----------------------------------|
 | InvalidRequestBodyError            | 400  | invalid_request_body              |
 | pydantic ValidationError           | 400  | validation_error                  |
-| NoOpenPositionError                | 404  | no_open_position                  |
-| CloseQuantityExceedsPositionError  | 409  | close_quantity_exceeds_position   |
+| TradeNotFoundError                 | 404  | trade_not_found                   |
+| TradeConflictError                 | 409  | trade_conflict                    |
+| TradeNotClosableError              | 409  | trade_not_closable                |
 | HedgeModeNotSupportedError         | 409  | hedge_mode_not_supported          |
 | BinanceAPIError                    | 422  | binance_rejected                  |
 | BinanceUnavailableError            | 502  | binance_unavailable               |
 | BinanceUnknownOutcomeError         | 504  | binance_outcome_unknown           |
 | werkzeug HTTPException (404, 405)  | as is| e.g. not_found                    |
 | anything else                      | 500  | internal_error                    |
+
+Binance failures *during* an open or close do not reach these handlers: the trade service
+records them on the trade, and the endpoint answers with the trade (see ``trade_routes``).
+The Binance rows above cover failures before a trade exists, such as the position check.
 """
 
 import logging
@@ -28,9 +33,10 @@ from binance_connector.errors import (
     BinanceAPIError,
     BinanceUnavailableError,
     BinanceUnknownOutcomeError,
-    CloseQuantityExceedsPositionError,
     HedgeModeNotSupportedError,
-    NoOpenPositionError,
+    TradeConflictError,
+    TradeNotClosableError,
+    TradeNotFoundError,
 )
 
 logger = logging.getLogger(__name__)
@@ -40,8 +46,9 @@ def register_error_handlers(app: Flask) -> None:
     """Attach every handler in this module to ``app``."""
     app.register_error_handler(InvalidRequestBodyError, _invalid_request_body)
     app.register_error_handler(ValidationError, _validation_error)
-    app.register_error_handler(NoOpenPositionError, _no_open_position)
-    app.register_error_handler(CloseQuantityExceedsPositionError, _close_quantity_exceeds_position)
+    app.register_error_handler(TradeNotFoundError, _trade_not_found)
+    app.register_error_handler(TradeConflictError, _trade_conflict)
+    app.register_error_handler(TradeNotClosableError, _trade_not_closable)
     app.register_error_handler(HedgeModeNotSupportedError, _hedge_mode_not_supported)
     app.register_error_handler(BinanceAPIError, _binance_rejected)
     app.register_error_handler(BinanceUnavailableError, _binance_unavailable)
@@ -75,19 +82,16 @@ def _validation_error(error: ValidationError) -> tuple[Response, int]:
     return _error_response(400, "validation_error", "The request body is invalid.", details=details)
 
 
-def _no_open_position(error: NoOpenPositionError) -> tuple[Response, int]:
-    return _error_response(404, "no_open_position", str(error), symbol=error.symbol)
+def _trade_not_found(error: TradeNotFoundError) -> tuple[Response, int]:
+    return _error_response(404, "trade_not_found", str(error), trade_id=error.trade_id)
 
 
-def _close_quantity_exceeds_position(error: CloseQuantityExceedsPositionError) -> tuple[Response, int]:
-    return _error_response(
-        409,
-        "close_quantity_exceeds_position",
-        str(error),
-        symbol=error.symbol,
-        requested_quantity=format(error.requested_quantity, "f"),
-        open_quantity=format(error.open_quantity, "f"),
-    )
+def _trade_conflict(error: TradeConflictError) -> tuple[Response, int]:
+    return _error_response(409, "trade_conflict", str(error))
+
+
+def _trade_not_closable(error: TradeNotClosableError) -> tuple[Response, int]:
+    return _error_response(409, "trade_not_closable", str(error), trade_id=error.trade_id, state=str(error.state))
 
 
 def _hedge_mode_not_supported(error: HedgeModeNotSupportedError) -> tuple[Response, int]:

@@ -6,6 +6,13 @@ Only the signed endpoints this service needs are implemented:
 * ``POST /fapi/v1/order``        place a MARKET order
 * ``GET  /fapi/v1/order``        look up an order (used for its average fill price)
 * ``GET  /fapi/v3/positionRisk`` read the current position for a symbol
+* ``POST /fapi/v1/algoOrder``    place a take-profit / stop-loss (conditional algo order)
+* ``DELETE /fapi/v1/algoOrder``  cancel one algo order
+* ``GET  /fapi/v1/algoOrder``    look up one algo order (status, fill price once triggered)
+* ``GET  /fapi/v1/openAlgoOrders`` list a symbol's untriggered algo orders
+
+Algo-order behaviour verified on Demo (2026-11-05) is described in
+``tests/fixtures/demo_capture_2026_11_05.json`` and the docstrings below.
 
 Every parameter, including ``signature``, goes in the query string. Binance
 allows this for POST, and building the URL ourselves keeps the parameter order
@@ -118,6 +125,49 @@ class BinanceFuturesClient:
     def get_position_risk(self, *, symbol: str) -> list[dict[str, Any]]:
         """Return the position entries for ``symbol`` (empty when there is nothing open)."""
         return self._send_signed("GET", "/fapi/v3/positionRisk", [("symbol", symbol)])
+
+    def place_conditional_close(
+        self,
+        *,
+        symbol: str,
+        side: OrderSide,
+        order_type: Literal["TAKE_PROFIT_MARKET", "STOP_MARKET"],
+        trigger_price: Decimal,
+        client_algo_id: str,
+        working_type: Literal["MARK_PRICE", "CONTRACT_PRICE"],
+    ) -> dict[str, Any]:
+        """Place a take-profit or stop-loss that closes the whole position when triggered.
+
+        ``closePosition=true`` (no quantity) makes it close whatever is open at trigger time.
+        Binance expires such orders by itself once the position is flat, and rejects a
+        trigger price that is already crossed with ``-2021``.
+        """
+        return self._send_signed(
+            "POST",
+            "/fapi/v1/algoOrder",
+            [
+                ("algoType", "CONDITIONAL"),
+                ("symbol", symbol),
+                ("side", side),
+                ("type", order_type),
+                ("triggerPrice", format_decimal(trigger_price)),
+                ("closePosition", "true"),
+                ("workingType", working_type),
+                ("clientAlgoId", client_algo_id),
+            ],
+        )
+
+    def cancel_algo_order(self, *, client_algo_id: str) -> dict[str, Any]:
+        """Cancel an algo order. ``-2011 Unknown order sent`` means it is no longer open."""
+        return self._send_signed("DELETE", "/fapi/v1/algoOrder", [("clientAlgoId", client_algo_id)])
+
+    def get_algo_order(self, *, client_algo_id: str) -> dict[str, Any]:
+        """Look up an algo order. Once triggered it reports ``actualOrderId``/``actualPrice``/``actualQty``."""
+        return self._send_signed("GET", "/fapi/v1/algoOrder", [("clientAlgoId", client_algo_id)])
+
+    def get_open_algo_orders(self, *, symbol: str) -> list[dict[str, Any]]:
+        """The symbol's algo orders that have not triggered, been cancelled or expired."""
+        return self._send_signed("GET", "/fapi/v1/openAlgoOrders", [("symbol", symbol)])
 
     def _send_signed(self, method: str, path: str, parameters: list[tuple[str, str]]) -> Any:
         """Add timestamp and recvWindow, sign, send, and turn failures into typed errors."""

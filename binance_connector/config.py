@@ -22,6 +22,10 @@ DEFAULT_TIMEOUT_SECONDS = 10.0
 DEFAULT_DATABASE_URL = "sqlite:///binance_connector.db"
 """A SQLite file in the working directory, shared by the API and the worker."""
 
+TRIGGER_PRICE_TYPES = ("MARK_PRICE", "CONTRACT_PRICE")
+DEFAULT_TRIGGER_PRICE_TYPE = "MARK_PRICE"
+"""Mark price is less prone to single-trade wicks than the last traded price (decision D-34)."""
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -37,6 +41,7 @@ class Settings:
     recv_window_ms: int = DEFAULT_RECV_WINDOW_MS
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
     database_url: str = DEFAULT_DATABASE_URL
+    trigger_price_type: str = DEFAULT_TRIGGER_PRICE_TYPE
 
     @classmethod
     def from_environment(cls, environment: Mapping[str, str]) -> "Settings":
@@ -52,6 +57,7 @@ class Settings:
             recv_window_ms=_read_recv_window(environment),
             timeout_seconds=_read_timeout(environment),
             database_url=environment.get("DATABASE_URL", DEFAULT_DATABASE_URL).strip() or DEFAULT_DATABASE_URL,
+            trigger_price_type=_read_trigger_price_type(environment),
         )
 
 
@@ -76,6 +82,15 @@ def _read_recv_window(environment: Mapping[str, str]) -> int:
             f"{variable} must be between 1 and {MAX_RECV_WINDOW_MS}, got {recv_window_ms}."
         )
     return recv_window_ms
+
+
+def _read_trigger_price_type(environment: Mapping[str, str]) -> str:
+    """Read BINANCE_TRIGGER_PRICE_TYPE: MARK_PRICE (default) or CONTRACT_PRICE."""
+    variable = "BINANCE_TRIGGER_PRICE_TYPE"
+    value = environment.get(variable, DEFAULT_TRIGGER_PRICE_TYPE).strip().upper()
+    if value not in TRIGGER_PRICE_TYPES:
+        raise ConfigurationError(f"{variable} must be one of {', '.join(TRIGGER_PRICE_TYPES)}, got {value!r}.")
+    return value
 
 
 def _read_timeout(environment: Mapping[str, str]) -> float:

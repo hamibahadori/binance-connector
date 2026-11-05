@@ -204,20 +204,20 @@ class PositionService:
             leverage=None,
         )
 
-    def _read_net_position(self, symbol: str) -> Decimal:
-        """Return the signed one-way position amount for ``symbol``; never zero.
+    def net_position(self, symbol: str) -> Decimal:
+        """The signed one-way position amount for ``symbol``: positive long, negative short, 0 flat.
 
         Raises:
             HedgeModeNotSupportedError: any entry is a hedge-mode (LONG/SHORT) entry.
-            NoOpenPositionError: there is no non-zero one-way position.
         """
         position_entries = self._client.get_position_risk(symbol=symbol)
         if any(entry.get("positionSide") != ONE_WAY_POSITION_SIDE for entry in position_entries):
             raise HedgeModeNotSupportedError(symbol)
+        return sum((Decimal(entry["positionAmt"]) for entry in position_entries), start=Decimal(0))
 
-        position_amount = sum(
-            (Decimal(entry["positionAmt"]) for entry in position_entries), start=Decimal(0)
-        )
+    def _read_net_position(self, symbol: str) -> Decimal:
+        """Like ``net_position``, but a flat symbol raises NoOpenPositionError."""
+        position_amount = self.net_position(symbol)
         if position_amount == 0:
             raise NoOpenPositionError(symbol)
         return position_amount
