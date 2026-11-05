@@ -26,6 +26,12 @@ TRIGGER_PRICE_TYPES = ("MARK_PRICE", "CONTRACT_PRICE")
 DEFAULT_TRIGGER_PRICE_TYPE = "MARK_PRICE"
 """Mark price is less prone to single-trade wicks than the last traded price (decision D-34)."""
 
+DEMO_STREAM_URL = "wss://demo-fstream.binance.com/ws"
+"""Demo user-data stream base; the listenKey is appended. Verified on Demo 2026-11-05.
+Production documents ``wss://fstream.binance.com/private/ws``."""
+
+DEFAULT_RECONCILE_INTERVAL_SECONDS = 60.0
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -42,6 +48,8 @@ class Settings:
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
     database_url: str = DEFAULT_DATABASE_URL
     trigger_price_type: str = DEFAULT_TRIGGER_PRICE_TYPE
+    stream_url: str = DEMO_STREAM_URL
+    reconcile_interval_seconds: float = DEFAULT_RECONCILE_INTERVAL_SECONDS
 
     @classmethod
     def from_environment(cls, environment: Mapping[str, str]) -> "Settings":
@@ -58,6 +66,10 @@ class Settings:
             timeout_seconds=_read_timeout(environment),
             database_url=environment.get("DATABASE_URL", DEFAULT_DATABASE_URL).strip() or DEFAULT_DATABASE_URL,
             trigger_price_type=_read_trigger_price_type(environment),
+            stream_url=environment.get("BINANCE_STREAM_URL", DEMO_STREAM_URL).strip().rstrip("/"),
+            reconcile_interval_seconds=_read_positive_number(
+                environment, "RECONCILE_INTERVAL_SECONDS", DEFAULT_RECONCILE_INTERVAL_SECONDS
+            ),
         )
 
 
@@ -95,12 +107,16 @@ def _read_trigger_price_type(environment: Mapping[str, str]) -> str:
 
 def _read_timeout(environment: Mapping[str, str]) -> float:
     """Read BINANCE_TIMEOUT_SECONDS: a positive number of seconds."""
-    variable = "BINANCE_TIMEOUT_SECONDS"
-    raw_value = environment.get(variable, str(DEFAULT_TIMEOUT_SECONDS))
+    return _read_positive_number(environment, "BINANCE_TIMEOUT_SECONDS", DEFAULT_TIMEOUT_SECONDS)
+
+
+def _read_positive_number(environment: Mapping[str, str], variable: str, default: float) -> float:
+    """Read ``variable`` as a number greater than 0, or ``default`` when unset."""
+    raw_value = environment.get(variable, str(default))
     try:
-        timeout_seconds = float(raw_value)
+        number = float(raw_value)
     except ValueError as error:
         raise ConfigurationError(f"{variable} must be a number, got {raw_value!r}.") from error
-    if timeout_seconds <= 0:
-        raise ConfigurationError(f"{variable} must be greater than 0, got {timeout_seconds}.")
-    return timeout_seconds
+    if number <= 0:
+        raise ConfigurationError(f"{variable} must be greater than 0, got {number}.")
+    return number

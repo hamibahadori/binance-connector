@@ -114,7 +114,21 @@ class UserDataEventHandler:
                 closed_at=closed_at,
             )
         except InvalidTransitionError:
-            return  # already closed by the other event of the same fill
+            # Already closed: by the other event of the same fill (nothing to do), or by
+            # reconciliation as EXTERNAL because REST lagged behind the stream. In the second
+            # case this fill is the real explanation, so it corrects the record.
+            current = self._repository.get(trade_id)
+            if current.state is TradeState.CLOSED and current.close_reason is CloseReason.EXTERNAL:
+                self._repository.update_fields(
+                    trade_id,
+                    event_detail={"correction": "a TP/SL fill explains the close"},
+                    close_reason=PROTECTION_CLOSE_REASONS[role],
+                    exit_order_id=exit_order_id,
+                    exit_price=exit_price,
+                    closed_at=closed_at,
+                    last_error=None,
+                )
+            return
         logger.info("Trade %s closed by its %s at %s", trade_id, role, exit_price)
         self._trade_service.cancel_protection(trade_id)
 

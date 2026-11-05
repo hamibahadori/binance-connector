@@ -158,6 +158,31 @@ def test_an_exit_fill_for_a_trade_the_api_already_closed_changes_nothing(handler
     assert repository.get("spike-a").close_reason is CloseReason.MANUAL
 
 
+def test_a_late_protection_fill_corrects_a_trade_reconciliation_closed_as_external(handler, repository):
+    """REST can lag behind the stream: reconciliation may see 'flat, no TP/SL fill' first."""
+    stored_trade(repository, "spike-b", PROTECTED_PATH)
+    repository.transition("spike-b", TradeState.CLOSED, close_reason=CloseReason.EXTERNAL, last_error="unexplained")
+
+    for event in events_for("lx-spike-b-sl"):
+        handler.handle(event)
+
+    trade = repository.get("spike-b")
+    assert trade.close_reason is CloseReason.STOP_LOSS
+    assert trade.exit_price == Decimal("78016.6")
+    assert trade.last_error is None
+
+
+def test_a_protection_fill_never_overrides_another_close_reason(handler, repository):
+    stored_trade(repository, "spike-b", PROTECTED_PATH)
+    repository.transition("spike-b", TradeState.CLOSED, close_reason=CloseReason.TAKE_PROFIT,
+                          exit_price=Decimal("78052.6"))
+
+    for event in events_for("lx-spike-b-sl"):
+        handler.handle(event)
+
+    assert repository.get("spike-b").close_reason is CloseReason.TAKE_PROFIT
+
+
 def test_account_updates_ask_for_reconciliation_of_symbols_with_active_trades(handler, repository):
     stored_trade(repository, "spike-b", PROTECTED_PATH)
     account_update = stream_events("ACCOUNT_UPDATE")[0]

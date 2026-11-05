@@ -72,6 +72,34 @@ def test_invalid_numeric_setting_is_rejected(variable, bad_value):
         Settings.from_environment(environment)
 
 
+def test_worker_settings_have_demo_defaults():
+    settings = Settings.from_environment(REQUIRED_ENVIRONMENT)
+
+    assert settings.stream_url == "wss://demo-fstream.binance.com/ws"
+    assert settings.reconcile_interval_seconds == 60.0
+    assert settings.database_url == "sqlite:///binance_connector.db"
+    assert settings.trigger_price_type == "MARK_PRICE"
+
+
+def test_worker_settings_can_be_overridden():
+    settings = Settings.from_environment({
+        **REQUIRED_ENVIRONMENT,
+        "BINANCE_STREAM_URL": "wss://fstream.binance.com/private/ws/",
+        "RECONCILE_INTERVAL_SECONDS": "15",
+        "BINANCE_TRIGGER_PRICE_TYPE": "contract_price",
+    })
+
+    assert settings.stream_url == "wss://fstream.binance.com/private/ws"
+    assert settings.reconcile_interval_seconds == 15.0
+    assert settings.trigger_price_type == "CONTRACT_PRICE"
+
+
+@pytest.mark.parametrize("bad_interval", ["0", "-5", "often"])
+def test_an_invalid_reconcile_interval_is_rejected(bad_interval):
+    with pytest.raises(ConfigurationError, match="RECONCILE_INTERVAL_SECONDS"):
+        Settings.from_environment({**REQUIRED_ENVIRONMENT, "RECONCILE_INTERVAL_SECONDS": bad_interval})
+
+
 def test_credentials_are_hidden_from_repr():
     settings = Settings.from_environment(REQUIRED_ENVIRONMENT)
 
