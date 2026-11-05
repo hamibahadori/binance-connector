@@ -19,6 +19,9 @@ MAX_RECV_WINDOW_MS = 60000
 
 DEFAULT_TIMEOUT_SECONDS = 10.0
 
+DEFAULT_DATABASE_URL = "sqlite:///binance_connector.db"
+"""A SQLite file in the working directory, shared by the API and the worker."""
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -33,6 +36,7 @@ class Settings:
     base_url: str = DEMO_BASE_URL
     recv_window_ms: int = DEFAULT_RECV_WINDOW_MS
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
+    database_url: str = DEFAULT_DATABASE_URL
 
     @classmethod
     def from_environment(cls, environment: Mapping[str, str]) -> "Settings":
@@ -47,6 +51,7 @@ class Settings:
             base_url=environment.get("BINANCE_BASE_URL", DEMO_BASE_URL).strip().rstrip("/"),
             recv_window_ms=_read_recv_window(environment),
             timeout_seconds=_read_timeout(environment),
+            database_url=environment.get("DATABASE_URL", DEFAULT_DATABASE_URL).strip() or DEFAULT_DATABASE_URL,
         )
 
 

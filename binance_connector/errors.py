@@ -70,6 +70,39 @@ class HedgeModeNotSupportedError(BinanceConnectorError):
         self.symbol = symbol
 
 
+class InvalidTransitionError(BinanceConnectorError):
+    """A trade was asked to move to a state its current state does not allow.
+
+    Usually means another process (API or worker) changed the trade first.
+    """
+
+    def __init__(self, current_state: object, target_state: object) -> None:
+        super().__init__(f"A trade cannot move from {current_state} to {target_state}.")
+        self.current_state = current_state
+        self.target_state = target_state
+
+
+class TradeNotFoundError(BinanceConnectorError):
+    """No trade exists with the given id."""
+
+    def __init__(self, trade_id: str) -> None:
+        super().__init__(f"There is no trade with id {trade_id}.")
+        self.trade_id = trade_id
+
+
+class TradeConflictError(BinanceConnectorError):
+    """A new trade clashes with an existing one (same symbol active, or same request id)."""
+
+
+class TradeNotClosableError(BinanceConnectorError):
+    """A close was requested for a trade whose state does not allow closing."""
+
+    def __init__(self, trade_id: str, state: object) -> None:
+        super().__init__(f"Trade {trade_id} is {state} and cannot be closed now.")
+        self.trade_id = trade_id
+        self.state = state
+
+
 class CloseQuantityExceedsPositionError(BinanceConnectorError):
     """A partial close asked for more than the open position holds."""
 
