@@ -43,6 +43,8 @@ OrderSide = Literal["BUY", "SELL"]
 
 API_KEY_HEADER = "X-MBX-APIKEY"
 
+LISTEN_KEY_PATH = "/fapi/v1/listenKey"
+
 logger = logging.getLogger(__name__)
 
 
@@ -169,6 +171,20 @@ class BinanceFuturesClient:
         """The symbol's algo orders that have not triggered, been cancelled or expired."""
         return self._send_signed("GET", "/fapi/v1/openAlgoOrders", [("symbol", symbol)])
 
+    # --- user-data stream (API key only, no signature) ------------------------------------------
+
+    def start_user_stream(self) -> str:
+        """Create (or extend) the account's listenKey for the user-data stream; valid 60 minutes."""
+        return self._send("POST", LISTEN_KEY_PATH, f"{self._settings.base_url}{LISTEN_KEY_PATH}")["listenKey"]
+
+    def keepalive_user_stream(self) -> None:
+        """Extend the listenKey by another 60 minutes."""
+        self._send("PUT", LISTEN_KEY_PATH, f"{self._settings.base_url}{LISTEN_KEY_PATH}")
+
+    def close_user_stream(self) -> None:
+        """Invalidate the listenKey."""
+        self._send("DELETE", LISTEN_KEY_PATH, f"{self._settings.base_url}{LISTEN_KEY_PATH}")
+
     def _send_signed(self, method: str, path: str, parameters: list[tuple[str, str]]) -> Any:
         """Add timestamp and recvWindow, sign, send, and turn failures into typed errors."""
         signed_parameters = [
@@ -179,7 +195,10 @@ class BinanceFuturesClient:
         query_string = urllib.parse.urlencode(signed_parameters)
         signature = sign_query(query_string, self._settings.api_secret)
         url = f"{self._settings.base_url}{path}?{query_string}&signature={signature}"
+        return self._send(method, path, url)
 
+    def _send(self, method: str, path: str, url: str) -> Any:
+        """Send one request and turn failures into typed errors (the API key header is always set)."""
         try:
             response = self._session.request(method, url, timeout=self._settings.timeout_seconds)
         except requests.exceptions.ConnectTimeout as error:
