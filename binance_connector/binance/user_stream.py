@@ -103,6 +103,8 @@ class UserDataStream:
         self._keepalive_interval_seconds = keepalive_interval_seconds
         self._max_connection_age_seconds = max_connection_age_seconds
         self._max_backoff_seconds = max_backoff_seconds
+        self.connected = False
+        """True while a connection is open (read by the live feed's service status)."""
 
     def run(
         self,
@@ -133,6 +135,7 @@ class UserDataStream:
         listen_key = self._client.start_user_stream()
         connection = self._connect(f"{self._stream_url}/{listen_key}")
         logger.info("User-data stream connected")
+        self.connected = True
         try:
             connected_at = last_keepalive_at = self._clock()
             _call_safely("on_connected", on_connected)
@@ -150,6 +153,7 @@ class UserDataStream:
                     return
                 _call_safely("on_idle", on_idle)
         finally:
+            self.connected = False
             connection.close()
 
     def _deliver(self, message: str, on_event) -> str | None:

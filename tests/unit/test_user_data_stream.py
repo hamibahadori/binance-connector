@@ -279,3 +279,27 @@ def test_messages_that_are_not_json_are_skipped():
     harness.run()
 
     assert harness.events == [{"e": "OK"}]
+
+
+def test_the_stream_reports_connected_while_a_connection_is_open():
+    seen_while_connected = []
+    harness = StreamHarness([[None], [None]], max_connection_age_seconds=1)
+
+    def on_connected():
+        seen_while_connected.append(harness.stream.connected)
+
+    assert harness.stream.connected is False
+    harness.run(on_connected=on_connected)
+
+    assert seen_while_connected == [True, True]
+    assert harness.stream.connected is False  # closed once stopped
+
+
+def test_the_stream_reports_disconnected_after_a_failure():
+    states_while_backing_off = []
+    harness = StreamHarness([[ConnectionError("dropped")], [None]])
+    harness.stream._sleep = lambda seconds: states_while_backing_off.append(harness.stream.connected)
+
+    harness.run()
+
+    assert states_while_backing_off == [False]

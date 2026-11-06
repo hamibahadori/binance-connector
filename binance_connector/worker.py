@@ -18,6 +18,10 @@ Threads:
   has an active position, stored for the API and passed to listeners.
 * **report dispatcher** (``ReportDispatcher``): delivers the report outbox to Django, in
   order per position, retrying until ``DJANGO_REPORT_MAX_ATTEMPTS``.
+* **live feed** (``LiveFeedHub``): publishes new reports and the service status to the
+  WebSocket clients; price ticks reach it from the price feed's thread.
+* **WebSocket server** (``LiveFeedServer``): ``ws://WEBSOCKET_HOST:WEBSOCKET_PORT/ws``, on
+  an asyncio event loop of its own.
 
 Ctrl+C or SIGTERM stops the loop, then every stream, then the pool (running requests finish).
 """
@@ -34,13 +38,16 @@ from binance_connector.binance.user_stream import UserDataStream
 from binance_connector.composition import build_components, load_settings
 from binance_connector.config import Settings
 from binance_connector.persistence.positions import PositionRepository
+from binance_connector.security.redaction import REDACTOR
 from binance_connector.services.account_clients import AccountClients
 from binance_connector.services.execution_manager import ExecutionManager
+from binance_connector.services.live_feed import LiveFeedHub
 from binance_connector.services.position_manager import PositionManager
 from binance_connector.services.price_feed import PriceFeed
 from binance_connector.services.reconciliation import ReconciliationService
 from binance_connector.services.reporting import ReportDispatcher
 from binance_connector.services.stream_events import UserDataEventHandler
+from binance_connector.services.websocket_server import LiveFeedServer
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +107,10 @@ class StreamScheduler:
     def stop(self) -> None:
         self._stop_requested.set()
 
+    @property
+    def connected(self) -> bool:
+        return bool(getattr(self._stream, "connected", False))
+
     def _on_event(self, event: dict[str, Any]) -> None:
         for symbol in self._event_handler.handle(event):
             self._symbols_due.setdefault(symbol, self._clock() + self._settle_delay_seconds)
@@ -149,6 +160,10 @@ class AccountStream:
         self._scheduler.stop()
         self._thread.join(timeout=STREAM_STOP_TIMEOUT_SECONDS)
 
+    @property
+    def connected(self) -> bool:
+        return self._scheduler.connected
+
 
 class ExecutionLoop(Protocol):
     def recover(self) -> int: ...
@@ -177,6 +192,7 @@ class WorkerProcess:
         limit_expiry_seconds: float = LIMIT_EXPIRY_CHECK_SECONDS,
         background_tasks: list[Callable[[Callable[[], bool]], None]] | None = None,
         price_feed: PriceFeed | None = None,
+        live_feed_server: LiveFeedServer | None = None,
         on_shutdown: Callable[[], None] | None = None,
     ) -> None:
         self._positions = positions
@@ -193,7 +209,11 @@ class WorkerProcess:
         self._background_threads: list[threading.Thread] = []
         self.price_feed = price_feed
         """The live price feed, for components that need prices (the WebSocket manager)."""
+        self.live_feed_server = live_feed_server
+        """The WebSocket server, run as a background task (its port, once listening)."""
         self._streams: dict[str, Any] = {}
+        self._streams_lock = threading.Lock()
+        """Guards ``_streams``: the live feed reads it from its own thread."""
         self._stop_requested = threading.Event()
         self._next_stream_sync_at: float | None = None
         self._next_limit_expiry_at: float | None = None
@@ -202,8 +222,10 @@ class WorkerProcess:
         """Block until ``stop()``; then stop every stream and background task."""
         self._execution_manager.recover()
         for task in self._background_tasks:
+            owner = getattr(task, "__self__", None)  # e.g. PriceFeed for PriceFeed.run
             thread = threading.Thread(target=task, args=(self._stop_requested.is_set,), daemon=True,
-                                      name=getattr(task, "__name__", "background"))
+                                      name=type(owner).__name__ if owner is not None
+                                      else getattr(task, "__name__", "background"))
             thread.start()
             self._background_threads.append(thread)
         try:
@@ -239,18 +261,32 @@ class WorkerProcess:
     def sync_streams(self) -> None:
         """Run a stream for exactly the accounts that have an active position."""
         wanted_accounts = {position.account_id for position in self._positions.list_active()}
-        for account_id in sorted(wanted_accounts - self._streams.keys()):
+        with self._streams_lock:
+            running_accounts = set(self._streams)
+        for account_id in sorted(wanted_accounts - running_accounts):
             stream = self._stream_factory(account_id)
             stream.start()
-            self._streams[account_id] = stream
+            with self._streams_lock:
+                self._streams[account_id] = stream
             logger.info("Started the user-data stream of account %s", account_id)
-        for account_id in sorted(self._streams.keys() - wanted_accounts):
-            self._streams.pop(account_id).stop()
+        for account_id in sorted(running_accounts - wanted_accounts):
+            with self._streams_lock:
+                stream = self._streams.pop(account_id)
+            stream.stop()
             logger.info("Stopped the user-data stream of account %s (no active position)", account_id)
 
+    def stream_status(self) -> dict[str, bool]:
+        """Whether each running account stream is connected to Binance right now."""
+        with self._streams_lock:
+            streams = dict(self._streams)
+        return {account_id: bool(getattr(stream, "connected", False)) for account_id, stream in streams.items()}
+
     def _stop_streams(self) -> None:
-        while self._streams:
-            _account_id, stream = self._streams.popitem()
+        while True:
+            with self._streams_lock:
+                if not self._streams:
+                    return
+                _account_id, stream = self._streams.popitem()
             stream.stop()
 
 
@@ -304,10 +340,25 @@ def build_worker(settings: Settings) -> WorkerProcess:
     )
     report_dispatcher = ReportDispatcher(reports=components.reports, error_logs=components.error_logs,
                                          settings=settings)
-    return WorkerProcess(positions=components.positions, execution_manager=execution_manager,
-                         position_manager=position_manager, stream_factory=stream_factory,
-                         background_tasks=[price_feed.run, report_dispatcher.run], price_feed=price_feed,
-                         on_shutdown=release_resources)
+    live_feed = LiveFeedHub(positions=components.positions, accounts=components.accounts,
+                            reports=components.reports, market_data=components.market_data, price_feed=price_feed,
+                            stream_status=lambda: worker.stream_status())
+    price_feed.add_listener(live_feed.on_price_tick)
+    live_feed_server = LiveFeedServer(hub=live_feed, host=settings.websocket_host, port=settings.websocket_port,
+                                      token=settings.websocket_token)
+    _mask_tokens(settings)
+    worker = WorkerProcess(positions=components.positions, execution_manager=execution_manager,
+                           position_manager=position_manager, stream_factory=stream_factory,
+                           background_tasks=[price_feed.run, report_dispatcher.run, live_feed.run,
+                                             live_feed_server.run],
+                           price_feed=price_feed, live_feed_server=live_feed_server, on_shutdown=release_resources)
+    return worker
+
+
+def _mask_tokens(settings: Settings) -> None:
+    """Keep the WebSocket token and Django's auth value out of every log line."""
+    auth_value = settings.django_report_auth_value or ""
+    REDACTOR.register(settings.websocket_token or "", auth_value, auth_value.rpartition(" ")[2])
 
 
 def main() -> None:

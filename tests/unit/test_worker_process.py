@@ -45,6 +45,7 @@ class FakeAccountStream:
     def __init__(self, account_id: str, log: list) -> None:
         self.account_id = account_id
         self.log = log
+        self.connected = account_id == "account-1"  # account-2's stream is still connecting
 
     def start(self) -> None:
         self.log.append(("start", self.account_id))
@@ -190,3 +191,11 @@ def test_run_recovers_first_and_stops_every_stream_on_shutdown(positions, execut
     assert execution.recovered is True
     assert stream_log == [("start", "account-1"), ("stop", "account-1")]
     assert execution.dispatches == 3
+
+
+def test_the_worker_reports_whether_each_account_stream_is_connected(worker, positions):
+    store_position(positions)
+    store_position(positions, position_id="p00000000000000000000002", account_id="account-2")
+    worker.tick()
+
+    assert worker.stream_status() == {"account-1": True, "account-2": False}
