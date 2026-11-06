@@ -94,6 +94,44 @@ class FakeBinance:
         reply.pop("cumQuote")
         return reply
 
+    def place_limit_order(self, *, symbol, side, quantity, price, client_order_id) -> dict[str, Any]:
+        """A marketable limit fills at once at ``fill_price``; otherwise it rests as NEW."""
+        self._record_call("place_limit_order", symbol=symbol, side=side, quantity=quantity, price=price,
+                          client_order_id=client_order_id)
+        marketable = price >= self.fill_price if side == "BUY" else price <= self.fill_price
+        order_id = next(self._order_ids)
+        order = self._order_record(order_id, symbol, side, quantity, client_order_id, self.fill_price, False)
+        order.update(type="LIMIT", price=format(price, "f"))
+        if marketable:
+            self._set_position(symbol, self.positions.get(symbol, Decimal(0)) + (quantity if side == "BUY" else -quantity))
+        else:
+            order.update(status="NEW", executedQty="0.0000", cumQty="0.0000", avgPrice="0.00", cumQuote="0")
+        self.orders[client_order_id] = order
+        reply = dict(order)
+        reply.pop("avgPrice")
+        reply.pop("cumQuote")
+        return reply
+
+    def fill_resting(self, client_order_id: str, quantity: str | None = None) -> None:
+        """Simulate the market reaching a resting limit order: fill all of it, or ``quantity``."""
+        order = self.orders[client_order_id]
+        total = Decimal(order["origQty"])
+        already_filled = Decimal(order["executedQty"])
+        filled_now = Decimal(quantity) if quantity is not None else total - already_filled
+        executed = already_filled + filled_now
+        order.update(executedQty=format(executed, "f"), cumQty=format(executed, "f"),
+                     avgPrice=order["price"], status="FILLED" if executed == total else "PARTIALLY_FILLED")
+        signed = filled_now if order["side"] == "BUY" else -filled_now
+        self._set_position(order["symbol"], self.positions.get(order["symbol"], Decimal(0)) + signed)
+
+    def cancel_order(self, *, symbol: str, client_order_id: str) -> dict[str, Any]:
+        self._record_call("cancel_order", symbol=symbol, client_order_id=client_order_id)
+        order = self.orders.get(client_order_id)
+        if order is None or order["status"] not in ("NEW", "PARTIALLY_FILLED"):
+            raise BinanceAPIError(*UNKNOWN_ORDER_SENT)
+        order["status"] = "CANCELED"
+        return dict(order)
+
     def get_order(self, *, symbol: str, client_order_id: str) -> dict[str, Any]:
         self._record_call("get_order", symbol=symbol, client_order_id=client_order_id)
         if client_order_id not in self.orders:

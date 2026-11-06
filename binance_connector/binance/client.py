@@ -123,6 +123,38 @@ class BinanceFuturesClient:
         ]
         return self._send_signed("POST", "/fapi/v1/order", parameters)
 
+    def place_limit_order(
+        self,
+        *,
+        symbol: str,
+        side: OrderSide,
+        quantity: Decimal,
+        price: Decimal,
+        client_order_id: str,
+    ) -> dict[str, Any]:
+        """Place a GTC LIMIT order (a LIMIT entry). Verified on Demo: a resting order replies
+        ``NEW``, a marketable one ``FILLED``; neither reply carries avgPrice."""
+        return self._send_signed(
+            "POST",
+            "/fapi/v1/order",
+            [
+                ("symbol", symbol),
+                ("side", side),
+                ("type", "LIMIT"),
+                ("timeInForce", "GTC"),
+                ("quantity", format_decimal(quantity)),
+                ("price", format_decimal(price)),
+                ("newClientOrderId", client_order_id),
+                ("newOrderRespType", "RESULT"),
+            ],
+        )
+
+    def cancel_order(self, *, symbol: str, client_order_id: str) -> dict[str, Any]:
+        """Cancel an order. ``-2011 Unknown order sent`` means it already filled or was cancelled."""
+        return self._send_signed(
+            "DELETE", "/fapi/v1/order", [("symbol", symbol), ("origClientOrderId", client_order_id)]
+        )
+
     def get_order(self, *, symbol: str, client_order_id: str) -> dict[str, Any]:
         """Return Binance's record of an order, including ``avgPrice``, found by our client order id."""
         return self._send_signed(

@@ -20,7 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from binance_connector.api.schemas import Leverage, PositiveQuantity, Symbol, _RequestBody, _upper_case_text
 from binance_connector.domain.lifecycle import RequestAction
 from binance_connector.domain.sizing import EntryType, QuantityType
-from binance_connector.services.position_service import PositionDirection
+from binance_connector.domain.direction import PositionDirection
 
 Identifier = Annotated[str, Field(pattern=r"^[A-Za-z0-9._:-]{1,64}$")]
 Credential = Annotated[str, Field(min_length=8, max_length=256)]
