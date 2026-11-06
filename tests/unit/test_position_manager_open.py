@@ -35,7 +35,7 @@ def test_a_market_long_with_tp_and_sl_ends_open_and_protected(manager, positions
 
     assert position.state is PositionState.OPEN
     assert binance(clients).call_names() == [
-        "get_position_risk", "change_leverage", "place_market_order", "get_order",
+        "get_position_risk", "change_leverage", "place_market_order", "get_order", "get_order_trades",
         "place_conditional_close", "place_conditional_close",
     ]
     entry = position.executions[ExecutionRole.ENTRY]
@@ -48,6 +48,19 @@ def test_a_market_long_with_tp_and_sl_ends_open_and_protected(manager, positions
     assert position.executions[ExecutionRole.STOP_LOSS].status == "NEW"
     assert position.executions[ExecutionRole.TAKE_PROFIT].status == "NEW"
     assert position.executions[ExecutionRole.STOP_LOSS].binance_id is not None
+
+
+def test_an_open_position_reports_its_entry_commission_as_fees_so_far(manager, positions):
+    """Found on Demo: fees showed null until the close although the entry fee was known."""
+    from binance_connector.presentation import position_view
+
+    store(positions)
+
+    position = manager.open(POSITION_ID)
+
+    entry_commission = Decimal("0.002") * Decimal("78000.0") * Decimal("0.0004")
+    assert position.commissions_so_far == entry_commission
+    assert position_view(position, user_id="user-1")["pnl"]["fees"] == format(entry_commission, "f")
 
 
 def test_the_stop_loss_goes_first_and_protection_closes_the_whole_position(manager, positions, clients):
@@ -77,7 +90,8 @@ def test_without_leverage_or_protection_only_the_entry_is_sent(manager, position
     position = manager.open(POSITION_ID)
 
     assert position.state is PositionState.OPEN
-    assert binance(clients).call_names() == ["get_position_risk", "place_market_order", "get_order"]
+    assert binance(clients).call_names() == ["get_position_risk", "place_market_order", "get_order",
+                                            "get_order_trades"]
 
 
 def test_the_entry_is_recorded_as_submitted_before_it_is_sent(manager, positions, clients):

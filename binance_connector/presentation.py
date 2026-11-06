@@ -77,7 +77,8 @@ def position_view(position: Position, *, user_id: str, market_price: MarketPrice
         gross_pnl = unrealized_pnl(direction=position.direction, entry_price=entry_average,
                                    quantity=filled_quantity, current_price=current_price)
         pnl_kind = "UNREALIZED"
-    fees = position.fees
+    # Stored at close; while open, the commissions of the fills so far (e.g. the entry's).
+    fees = position.fees if position.fees is not None else position.commissions_so_far
     net_pnl = None if gross_pnl is None else gross_pnl - (fees or Decimal(0))
 
     slippage = None

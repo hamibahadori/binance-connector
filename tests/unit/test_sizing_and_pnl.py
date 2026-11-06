@@ -96,5 +96,12 @@ def test_price_distance_is_absolute_and_in_percent_of_the_current_price():
     assert distance.percent == Decimal("2.5")
 
 
+def test_price_distance_percent_is_rounded_to_four_decimals():
+    """Found on Demo: 3788.8 / 75776.3 printed with 25 decimals."""
+    distance = price_distance(current_price=Decimal("75776.3"), target_price=Decimal("79565.1"))
+
+    assert str(distance.percent) == "5.0000"
+
+
 def test_price_distance_is_none_without_a_target():
     assert price_distance(current_price=Decimal("80000"), target_price=None) is None

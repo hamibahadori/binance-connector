@@ -42,6 +42,45 @@ def test_closing_sells_reduce_only_and_records_the_result(manager, clients, open
     assert position.executions[ExecutionRole.EXIT].status == "FILLED"
 
 
+def test_fees_are_read_from_binances_trades_at_close(manager, clients, open_position):
+    binance(clients).fill_price = Decimal("79000.0")
+
+    position = manager.close(POSITION_ID, CLOSE_REQUEST)
+
+    # 0.04% taker commission on each fill, as Binance Demo charged (0.0019 x 75776.3 x 0.0004 = 0.05759).
+    entry_commission = Decimal("0.002") * Decimal("78000.0") * Decimal("0.0004")
+    exit_commission = Decimal("0.002") * Decimal("79000.0") * Decimal("0.0004")
+    assert position.executions[ExecutionRole.ENTRY].commission == entry_commission
+    assert position.executions[ExecutionRole.EXIT].commission == exit_commission
+    assert position.fees == entry_commission + exit_commission
+    assert "get_order_trades" in binance(clients).call_names()
+
+
+def test_an_order_filled_in_several_trades_has_its_commissions_summed(manager, clients, open_position):
+    fake = binance(clients)
+    entry_order_id = fake.orders[f"lx-{POSITION_ID}-e"]["orderId"]
+    fake.trades[entry_order_id] = [
+        {"orderId": entry_order_id, "qty": "0.0013", "commission": "0.04", "commissionAsset": "USDT"},
+        {"orderId": entry_order_id, "qty": "0.0007", "commission": "0.02", "commissionAsset": "USDT"},
+    ]
+
+    position = manager.close(POSITION_ID, CLOSE_REQUEST)
+
+    assert position.executions[ExecutionRole.ENTRY].commission == Decimal("0.06")
+
+
+def test_fees_stay_unknown_rather_than_wrong_if_trades_cannot_be_read(manager, clients, open_position):
+    from binance_connector.errors import BinanceUnavailableError
+
+    for _ in range(4):
+        binance(clients).fail_next("get_order_trades", BinanceUnavailableError("no connection"))
+
+    position = manager.close(POSITION_ID, CLOSE_REQUEST)
+
+    assert position.state is PositionState.CLOSED
+    assert position.executions[ExecutionRole.EXIT].commission is None
+
+
 def test_protection_binance_expired_by_itself_is_recorded_as_expired(manager, open_position):
     position = manager.close(POSITION_ID, CLOSE_REQUEST)
 

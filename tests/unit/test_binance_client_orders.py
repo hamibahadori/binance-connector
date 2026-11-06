@@ -1,5 +1,6 @@
 """Unit tests for limit orders and order cancellation (replies recorded on Demo, 2026-11-07)."""
 
+import json
 import urllib.parse
 from decimal import Decimal
 
@@ -10,7 +11,7 @@ from binance_connector.binance.client import BinanceFuturesClient
 from binance_connector.config import DEMO_BASE_URL
 from binance_connector.errors import BinanceAPIError
 from tests.conftest import TEST_CREDENTIALS
-from tests.recorded import MARKET_AND_LIMIT_CAPTURE, rest_reply
+from tests.recorded import FIXTURES, MARKET_AND_LIMIT_CAPTURE, rest_reply
 
 FIXED_TIMESTAMP_MS = 1_700_000_000_000
 ORDER_URL = f"{DEMO_BASE_URL}/fapi/v1/order"
@@ -48,6 +49,18 @@ def test_cancel_order_by_client_order_id(client):
     assert responses.calls[0].request.method == "DELETE"
     assert unsigned_query(responses.calls[0].request.url).startswith("symbol=BTCUSDT&origClientOrderId=lx-spike2-l1&")
     assert reply["status"] == "CANCELED"
+
+
+@responses.activate
+def test_get_order_trades_lists_an_orders_fills_with_their_commission(client):
+    recorded = json.loads((FIXTURES / "demo_user_trades_2026_11_07.json").read_text())
+    trades = recorded["lx-251f5c29149146b9a19629fd-e"]["user_trades"]
+    responses.get(f"{DEMO_BASE_URL}/fapi/v1/userTrades", json=trades)
+
+    reply = client.get_order_trades(symbol="BTCUSDT", order_id=28668847591)
+
+    assert unsigned_query(responses.calls[0].request.url).startswith("symbol=BTCUSDT&orderId=28668847591&")
+    assert reply[0]["commission"] == "0.05758998"
 
 
 @responses.activate

@@ -30,6 +30,10 @@ logger = logging.getLogger(__name__)
 KEEPALIVE_INTERVAL_SECONDS = 30 * 60
 MAX_CONNECTION_AGE_SECONDS = 23 * 60 * 60
 RECEIVE_TIMEOUT_SECONDS = 1.0
+"""How long one receive waits before the loop gets a turn (keepalive, scheduled work)."""
+CONNECT_TIMEOUT_SECONDS = 30.0
+"""How long the WebSocket handshake may take. Separate from the receive timeout: a 1 s
+handshake limit failed on a slow link (Demo smoke run, 2026-11-07)."""
 MAX_BACKOFF_SECONDS = 60
 
 
@@ -49,8 +53,14 @@ class ListenKeyClient(Protocol):
 class WebSocketConnection:
     """``StreamConnection`` over websocket-client. Pings from Binance are answered automatically."""
 
-    def __init__(self, url: str, receive_timeout_seconds: float = RECEIVE_TIMEOUT_SECONDS) -> None:
-        self._socket = websocket.create_connection(url, timeout=receive_timeout_seconds)
+    def __init__(
+        self,
+        url: str,
+        connect_timeout_seconds: float = CONNECT_TIMEOUT_SECONDS,
+        receive_timeout_seconds: float = RECEIVE_TIMEOUT_SECONDS,
+    ) -> None:
+        self._socket = websocket.create_connection(url, timeout=connect_timeout_seconds)
+        self._socket.settimeout(receive_timeout_seconds)
 
     def receive(self) -> str | None:
         try:

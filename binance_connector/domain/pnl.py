@@ -6,7 +6,10 @@ separately, together with the net figure (decision D-57/F).
 """
 
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
+
+PERCENT_PLACES = Decimal("0.0001")
+"""Distances in percent are reported to four decimals."""
 
 
 def _sign(direction: str) -> int:
@@ -33,4 +36,5 @@ def price_distance(*, current_price: Decimal, target_price: Decimal | None) -> P
     if target_price is None:
         return None
     absolute = abs(target_price - current_price)
-    return PriceDistance(absolute=absolute, percent=(absolute / current_price * 100).normalize())
+    percent = (absolute / current_price * 100).quantize(PERCENT_PLACES, rounding=ROUND_HALF_UP)
+    return PriceDistance(absolute=absolute, percent=percent)

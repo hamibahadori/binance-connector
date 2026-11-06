@@ -44,6 +44,32 @@ def test_keepalive_and_close_use_put_and_delete(settings):
     assert [mocked_call.request.method for mocked_call in responses.calls] == ["PUT", "DELETE"]
 
 
+def test_the_websocket_connects_with_the_long_timeout_then_reads_with_the_short_one(monkeypatch):
+    """Found on Demo: a 1 s timeout used for connecting failed on a slow link."""
+    from binance_connector.binance import user_stream
+
+    class FakeSocket:
+        def __init__(self) -> None:
+            self.read_timeouts = []
+
+        def settimeout(self, seconds):
+            self.read_timeouts.append(seconds)
+
+    created = {}
+
+    def fake_create_connection(url, timeout):
+        created["timeout"] = timeout
+        created["socket"] = FakeSocket()
+        return created["socket"]
+
+    monkeypatch.setattr(user_stream.websocket, "create_connection", fake_create_connection)
+
+    user_stream.WebSocketConnection("wss://example.test/ws/key", connect_timeout_seconds=30, receive_timeout_seconds=1)
+
+    assert created["timeout"] == 30
+    assert created["socket"].read_timeouts == [1]
+
+
 # --- connection loop ----------------------------------------------------------------------------
 
 

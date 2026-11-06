@@ -31,6 +31,8 @@ class FakeBinance:
         self.orders: dict[str, dict[str, Any]] = {}
         self.algo_orders: dict[str, dict[str, Any]] = {}
         self.leverage: dict[str, int] = {}
+        self.trades: dict[int, list[dict[str, Any]]] = {}
+        """Fills per order id, each charged Binance Demo's 0.04% taker commission."""
         self.calls: list[tuple[str, dict[str, Any]]] = []
         self.hedge_mode = False
         self._failures: dict[str, list[Exception]] = {}
@@ -106,6 +108,7 @@ class FakeBinance:
             self._set_position(symbol, self.positions.get(symbol, Decimal(0)) + (quantity if side == "BUY" else -quantity))
         else:
             order.update(status="NEW", executedQty="0.0000", cumQty="0.0000", avgPrice="0.00", cumQuote="0")
+            self.trades.pop(order_id, None)  # nothing has filled yet
         self.orders[client_order_id] = order
         reply = dict(order)
         reply.pop("avgPrice")
@@ -121,6 +124,7 @@ class FakeBinance:
         executed = already_filled + filled_now
         order.update(executedQty=format(executed, "f"), cumQty=format(executed, "f"),
                      avgPrice=order["price"], status="FILLED" if executed == total else "PARTIALLY_FILLED")
+        self._record_trade(order["orderId"], filled_now, Decimal(order["price"]))
         signed = filled_now if order["side"] == "BUY" else -filled_now
         self._set_position(order["symbol"], self.positions.get(order["symbol"], Decimal(0)) + signed)
 
@@ -131,6 +135,10 @@ class FakeBinance:
             raise BinanceAPIError(*UNKNOWN_ORDER_SENT)
         order["status"] = "CANCELED"
         return dict(order)
+
+    def get_order_trades(self, *, symbol: str, order_id: int) -> list[dict[str, Any]]:
+        self._record_call("get_order_trades", symbol=symbol, order_id=order_id)
+        return [dict(trade) for trade in self.trades.get(order_id, [])]
 
     def get_order(self, *, symbol: str, client_order_id: str) -> dict[str, Any]:
         self._record_call("get_order", symbol=symbol, client_order_id=client_order_id)
@@ -201,7 +209,15 @@ class FakeBinance:
                 if algo_order["symbol"] == symbol and algo_order["algoStatus"] == "NEW":
                     algo_order["algoStatus"] = "EXPIRED"
 
+    def _record_trade(self, order_id: int, quantity: Decimal, price: Decimal) -> None:
+        self.trades.setdefault(order_id, []).append({
+            "orderId": order_id, "qty": format(quantity, "f"), "price": format(price, "f"),
+            "commission": format(quantity * price * Decimal("0.0004"), "f"), "commissionAsset": "USDT",
+        })
+
     def _order_record(self, order_id, symbol, side, quantity, client_order_id, price, reduce_only) -> dict[str, Any]:
+        if quantity > 0:
+            self._record_trade(order_id, quantity, price)
         return {
             "orderId": order_id, "symbol": symbol, "status": "FILLED", "clientOrderId": client_order_id,
             "side": side, "type": "MARKET", "reduceOnly": reduce_only,

@@ -62,6 +62,7 @@ def test_the_happy_path_is_allowed():
         (PositionState.CLOSING, PositionState.OPEN),
         (PositionState.CLOSING, PositionState.FAILED),
         (PositionState.CLOSING, PositionState.ERROR),
+        (PositionState.ERROR, PositionState.OPENING),  # an "unknown" entry was a resting limit after all
         (PositionState.ERROR, PositionState.OPEN),
         (PositionState.ERROR, PositionState.CLOSING),
         (PositionState.ERROR, PositionState.CLOSED),

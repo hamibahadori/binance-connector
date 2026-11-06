@@ -155,6 +155,10 @@ class BinanceFuturesClient:
             "DELETE", "/fapi/v1/order", [("symbol", symbol), ("origClientOrderId", client_order_id)]
         )
 
+    def get_order_trades(self, *, symbol: str, order_id: int) -> list[dict[str, Any]]:
+        """An order's fills, each with its ``commission`` and ``commissionAsset`` (verified on Demo)."""
+        return self._send_signed("GET", "/fapi/v1/userTrades", [("symbol", symbol), ("orderId", str(order_id))])
+
     def get_order(self, *, symbol: str, client_order_id: str) -> dict[str, Any]:
         """Return Binance's record of an order, including ``avgPrice``, found by our client order id."""
         return self._send_signed(

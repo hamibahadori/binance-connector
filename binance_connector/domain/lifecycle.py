@@ -93,8 +93,10 @@ POSITION_TRANSITIONS: dict[PositionState, frozenset[PositionState]] = {
     PositionState.CLOSING: frozenset(
         {PositionState.CLOSED, PositionState.OPEN, PositionState.FAILED, PositionState.ERROR}
     ),
+    # Reconciliation moves an ERROR on once Binance's state is known, including back to
+    # OPENING when an entry whose outcome was unknown turns out to be a resting limit order.
     PositionState.ERROR: frozenset(
-        {PositionState.OPEN, PositionState.CLOSING, PositionState.CLOSED, PositionState.FAILED}
+        {PositionState.OPENING, PositionState.OPEN, PositionState.CLOSING, PositionState.CLOSED, PositionState.FAILED}
     ),
     PositionState.CLOSED: frozenset(),
     PositionState.FAILED: frozenset(),

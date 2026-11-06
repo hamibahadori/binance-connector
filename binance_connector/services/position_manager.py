@@ -246,6 +246,7 @@ class PositionManager:
                                          executed_quantity=executed, average_price=average)
         if executed == 0:
             return self._positions.get(position_id)
+        self.record_commissions(position_id)
         opened = self._transition_or_none(position_id, PositionState.OPEN, entry_average_price=average,
                                           entry_filled_quantity=executed, opened_at=self._clock(), last_error=None)
         if opened is not None and protect:
@@ -323,21 +324,89 @@ class PositionManager:
         return self.finish_closed(position.position_id, CloseReason.CLOSE_REQUESTED, exit_average_price=average,
                                   closed_at=self._clock())
 
-    def finish_closed(self, position_id: str, reason: CloseReason, *, exit_average_price: Decimal | None,
-                      closed_at: datetime) -> Position:
-        """Move to CLOSED with realized P&L and fees. Shared with the stream handler and reconciliation."""
+    def record_commissions(self, position_id: str) -> Position:
+        """Read every filled order's commission from Binance's trade list and store the totals.
+
+        Commissions come from REST (``GET /fapi/v1/userTrades``), not from stream events: an
+        account's stream can start after its first fill, and money figures must not depend
+        on that timing (found on Demo, 2026-11-07). Totals are *set*, not added, so reading
+        again is harmless. An order whose trades cannot be read keeps its previous value.
+        """
         position = self._positions.get(position_id)
-        pnl = None
-        if position.entry_average_price is not None and exit_average_price is not None and position.entry_filled_quantity:
-            pnl = realized_pnl(direction=position.direction, entry_price=position.entry_average_price,
-                               exit_price=exit_average_price, quantity=position.entry_filled_quantity)
-        commissions = [execution.commission for execution in position.executions.values()
-                       if execution.commission is not None]
+        client = self._clients.for_account(position.account_id)
+        for role, execution in position.executions.items():
+            if not execution.executed_quantity:
+                continue
+            try:
+                order_id = execution.binance_id
+                if execution.kind == "ALGO":
+                    # A triggered TP/SL's fills belong to the order it created, which carries
+                    # the algo's client id (verified on Demo).
+                    order_id = client.get_order(symbol=position.symbol, client_order_id=execution.client_id)["orderId"]
+                trades = client.get_order_trades(symbol=position.symbol, order_id=order_id)
+            except BinanceError as error:
+                logger.warning("Position %s: the %s commission could not be read: %s", position_id, role.name, error)
+                continue
+            if trades:
+                commission = sum((Decimal(trade["commission"]) for trade in trades), Decimal(0))
+                self._positions.update_execution(position_id, role, commission=commission,
+                                                 commission_asset=trades[0].get("commissionAsset"))
+        return self._positions.get(position_id)
+
+    def finish_closed(self, position_id: str, reason: CloseReason, *, exit_average_price: Decimal | None,
+                      closed_at: datetime, note: str | None = None) -> Position:
+        """Move to CLOSED with realized P&L and fees. Shared with the stream handler and reconciliation."""
+        position = self.record_commissions(position_id)
         return self._transition_or_current(
             position_id, PositionState.CLOSED, close_reason=reason, exit_average_price=exit_average_price,
-            closed_at=closed_at, realized_pnl=pnl, fees=sum(commissions, Decimal(0)) if commissions else None,
-            last_error=None,
+            closed_at=closed_at, realized_pnl=_realized(position, exit_average_price), fees=total_fees(position),
+            last_error=note,
         )
+
+    def close_by_protection(self, position_id: str, role: ExecutionRole, *, exit_average_price: Decimal | None,
+                            closed_at: datetime) -> Position:
+        """A take-profit or stop-loss filled: CLOSED with that reason, then tidy up the other leg.
+
+        If reconciliation had already closed the position as EXTERNAL (REST can lag behind
+        the stream), this fill is the real explanation and corrects the record. Any other
+        existing close reason is kept.
+        """
+        reason = CloseReason.TAKE_PROFIT if role is ExecutionRole.TAKE_PROFIT else CloseReason.STOP_LOSS
+        position = self._positions.get(position_id)
+        if position.state is PositionState.CLOSED:
+            if position.close_reason is CloseReason.EXTERNAL:
+                return self._positions.update_fields(
+                    position_id, event_detail={"correction": "a TP/SL fill explains the close"},
+                    close_reason=reason, exit_average_price=exit_average_price, closed_at=closed_at,
+                    realized_pnl=_realized(position, exit_average_price), last_error=None,
+                )
+            return position
+        closed = self.finish_closed(position_id, reason, exit_average_price=exit_average_price, closed_at=closed_at)
+        if closed.state is PositionState.CLOSED and closed.close_reason is reason:
+            logger.info("Position %s closed by its %s at %s", position_id, reason.value, exit_average_price)
+            self.cancel_protection(position_id)
+        return self._positions.get(position_id)
+
+    def apply_entry_fill(self, position_id: str, *, executed_quantity: Decimal, average_price: Decimal | None,
+                         filled_at: datetime) -> Position:
+        """An entry fill learned from the stream or reconciliation (e.g. a resting limit filled).
+
+        The first fill makes the position OPEN and places its protection; later fills of the
+        same entry only update the filled quantity and average price.
+        """
+        position = self._positions.get(position_id)
+        if not position.entry_filled_quantity and position.state in (PositionState.OPENING, PositionState.ERROR):
+            self.record_commissions(position_id)
+            opened = self._transition_or_none(position_id, PositionState.OPEN, entry_average_price=average_price,
+                                              entry_filled_quantity=executed_quantity,
+                                              opened_at=position.opened_at or filled_at, last_error=None)
+            if opened is not None:
+                return self.protect(position_id)
+            return self._positions.get(position_id)
+        if is_active(position.state) and executed_quantity > (position.entry_filled_quantity or Decimal(0)):
+            return self._positions.update_fields(position_id, entry_filled_quantity=executed_quantity,
+                                                 entry_average_price=average_price or position.entry_average_price)
+        return position
 
     # --- helpers ------------------------------------------------------------------------------
 
@@ -387,6 +456,18 @@ def average_fill_price(client, symbol: str, reply: dict[str, Any]) -> Decimal | 
         logger.warning("Order %s filled, but its average price could not be read: %s", reply["clientOrderId"], error)
         return None
     return _positive_or_none(order.get("avgPrice"))
+
+
+def total_fees(position: Position) -> Decimal | None:
+    """The sum of every recorded commission of the position's orders, or None if none is known."""
+    return position.commissions_so_far
+
+
+def _realized(position: Position, exit_average_price: Decimal | None) -> Decimal | None:
+    if position.entry_average_price is None or exit_average_price is None or not position.entry_filled_quantity:
+        return None
+    return realized_pnl(direction=position.direction, entry_price=position.entry_average_price,
+                        exit_price=exit_average_price, quantity=position.entry_filled_quantity)
 
 
 def _positive_or_none(raw_value) -> Decimal | None:

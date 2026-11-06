@@ -110,6 +110,13 @@ class Position:
     updated_at: datetime
     executions: dict[ExecutionRole, Execution]
 
+    @property
+    def commissions_so_far(self) -> Decimal | None:
+        """The sum of every commission recorded on this position's orders; None if none is known."""
+        commissions = [execution.commission for execution in self.executions.values()
+                       if execution.commission is not None]
+        return sum(commissions, Decimal(0)) if commissions else None
+
 
 @dataclass(frozen=True)
 class PositionEvent:

@@ -1,0 +1,100 @@
+{
+  "lx-251f5c29149146b9a19629fd-e": {
+    "order": {
+      "orderId": 28668847591,
+      "symbol": "BTCUSDT",
+      "status": "FILLED",
+      "clientOrderId": "lx-251f5c29149146b9a19629fd-e",
+      "price": "0.00",
+      "avgPrice": "75776.300000",
+      "origQty": "0.0019",
+      "executedQty": "0.0019",
+      "cumQuote": "143.974970",
+      "timeInForce": "GTC",
+      "type": "MARKET",
+      "reduceOnly": false,
+      "closePosition": false,
+      "side": "BUY",
+      "positionSide": "BOTH",
+      "stopPrice": "0.00",
+      "workingType": "CONTRACT_PRICE",
+      "priceProtect": false,
+      "origType": "MARKET",
+      "priceMatch": "NONE",
+      "selfTradePreventionMode": "EXPIRE_MAKER",
+      "goodTillDate": 0,
+      "time": 1794001723035,
+      "updateTime": 1794001723039
+    },
+    "user_trades": [
+      {
+        "symbol": "BTCUSDT",
+        "id": 555030532,
+        "orderId": 28668847591,
+        "pair": "BTCUSDT",
+        "side": "BUY",
+        "price": "75776.30",
+        "qty": "0.0019",
+        "realizedPnl": "0",
+        "quoteQty": "143.974970",
+        "commission": "0.05758998",
+        "commissionAsset": "USDT",
+        "time": 1794001723039,
+        "buyer": true,
+        "maker": false,
+        "positionSide": "BOTH",
+        "baseQty": "0",
+        "marginAsset": "USDT"
+      }
+    ]
+  },
+  "lx-251f5c29149146b9a19629fd-x": {
+    "order": {
+      "orderId": 28668847661,
+      "symbol": "BTCUSDT",
+      "status": "FILLED",
+      "clientOrderId": "lx-251f5c29149146b9a19629fd-x",
+      "price": "0.00",
+      "avgPrice": "75768.700000",
+      "origQty": "0.0019",
+      "executedQty": "0.0019",
+      "cumQuote": "143.960530",
+      "timeInForce": "GTC",
+      "type": "MARKET",
+      "reduceOnly": true,
+      "closePosition": false,
+      "side": "SELL",
+      "positionSide": "BOTH",
+      "stopPrice": "0.00",
+      "workingType": "CONTRACT_PRICE",
+      "priceProtect": false,
+      "origType": "MARKET",
+      "priceMatch": "NONE",
+      "selfTradePreventionMode": "EXPIRE_MAKER",
+      "goodTillDate": 0,
+      "time": 1794001729603,
+      "updateTime": 1794001729607
+    },
+    "user_trades": [
+      {
+        "symbol": "BTCUSDT",
+        "id": 555030544,
+        "orderId": 28668847661,
+        "pair": "BTCUSDT",
+        "side": "SELL",
+        "price": "75768.70",
+        "qty": "0.0019",
+        "realizedPnl": "-0.01444000",
+        "quoteQty": "143.960530",
+        "commission": "0.05758421",
+        "commissionAsset": "USDT",
+        "time": 1794001729607,
+        "buyer": false,
+        "maker": false,
+        "positionSide": "BOTH",
+        "baseQty": "0",
+        "marginAsset": "USDT"
+      }
+    ]
+  }
+}
