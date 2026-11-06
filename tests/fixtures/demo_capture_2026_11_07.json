@@ -1,0 +1,1014 @@
+{
+  "rest": [
+    {
+      "label": "exchangeInfo BTCUSDT",
+      "reply": {
+        "symbol": "BTCUSDT",
+        "status": "TRADING",
+        "contractType": "PERPETUAL",
+        "pricePrecision": 2,
+        "quantityPrecision": 4,
+        "filters": [
+          {
+            "filterType": "PRICE_FILTER",
+            "minPrice": "261.10",
+            "tickSize": "0.10",
+            "maxPrice": "809484"
+          },
+          {
+            "minQty": "0.0001",
+            "stepSize": "0.0001",
+            "filterType": "LOT_SIZE",
+            "maxQty": "1000"
+          },
+          {
+            "minQty": "0.0001",
+            "maxQty": "120",
+            "stepSize": "0.0001",
+            "filterType": "MARKET_LOT_SIZE"
+          },
+          {
+            "limit": 10000,
+            "filterType": "MAX_NUM_ORDERS"
+          },
+          {
+            "filterType": "MIN_NOTIONAL",
+            "notional": "50"
+          },
+          {
+            "filterType": "PERCENT_PRICE",
+            "multiplierUp": "1.0500",
+            "multiplierDown": "0.9500",
+            "multiplierDecimal": "4"
+          },
+          {
+            "positionControlSide": "NONE",
+            "filterType": "POSITION_RISK_CONTROL"
+          }
+        ],
+        "orderTypes": [
+          "LIMIT",
+          "MARKET",
+          "STOP",
+          "STOP_MARKET",
+          "TAKE_PROFIT",
+          "TAKE_PROFIT_MARKET",
+          "TRAILING_STOP_MARKET"
+        ],
+        "triggerProtect": "0.0500"
+      }
+    },
+    {
+      "label": "exchangeInfo ETHUSDT",
+      "reply": {
+        "symbol": "ETHUSDT",
+        "status": "TRADING",
+        "contractType": "PERPETUAL",
+        "pricePrecision": 2,
+        "quantityPrecision": 3,
+        "filters": [
+          {
+            "minPrice": "39.86",
+            "maxPrice": "306177",
+            "tickSize": "0.01",
+            "filterType": "PRICE_FILTER"
+          },
+          {
+            "filterType": "LOT_SIZE",
+            "minQty": "0.001",
+            "stepSize": "0.001",
+            "maxQty": "10000"
+          },
+          {
+            "maxQty": "10000",
+            "filterType": "MARKET_LOT_SIZE",
+            "minQty": "0.001",
+            "stepSize": "0.001"
+          },
+          {
+            "filterType": "MAX_NUM_ORDERS",
+            "limit": 10000
+          },
+          {
+            "filterType": "MIN_NOTIONAL",
+            "notional": "20"
+          },
+          {
+            "filterType": "PERCENT_PRICE",
+            "multiplierUp": "1.0500",
+            "multiplierDecimal": "4",
+            "multiplierDown": "0.9500"
+          },
+          {
+            "filterType": "POSITION_RISK_CONTROL",
+            "positionControlSide": "NONE"
+          }
+        ],
+        "orderTypes": [
+          "LIMIT",
+          "MARKET",
+          "STOP",
+          "STOP_MARKET",
+          "TAKE_PROFIT",
+          "TAKE_PROFIT_MARKET",
+          "TRAILING_STOP_MARKET"
+        ],
+        "triggerProtect": "0.0500"
+      }
+    },
+    {
+      "label": "L1 place resting LIMIT BUY",
+      "reply": {
+        "orderId": 28668825321,
+        "symbol": "BTCUSDT",
+        "status": "NEW",
+        "clientOrderId": "lx-spike2-l1",
+        "price": "68291.60",
+        "origQty": "0.0020",
+        "executedQty": "0.0000",
+        "cumQty": "0.0000",
+        "timeInForce": "GTC",
+        "type": "LIMIT",
+        "reduceOnly": false,
+        "closePosition": false,
+        "side": "BUY",
+        "positionSide": "BOTH",
+        "stopPrice": "0.00",
+        "workingType": "CONTRACT_PRICE",
+        "priceProtect": false,
+        "origType": "LIMIT",
+        "priceMatch": "NONE",
+        "selfTradePreventionMode": "EXPIRE_MAKER",
+        "goodTillDate": 0,
+        "updateTime": 1793999761643
+      }
+    },
+    {
+      "label": "L1 query (resting)",
+      "reply": {
+        "orderId": 28668825321,
+        "symbol": "BTCUSDT",
+        "status": "NEW",
+        "clientOrderId": "lx-spike2-l1",
+        "price": "68291.60",
+        "avgPrice": "0.00",
+        "origQty": "0.0020",
+        "executedQty": "0.0000",
+        "cumQuote": "0.000000",
+        "timeInForce": "GTC",
+        "type": "LIMIT",
+        "reduceOnly": false,
+        "closePosition": false,
+        "side": "BUY",
+        "positionSide": "BOTH",
+        "stopPrice": "0.00",
+        "workingType": "CONTRACT_PRICE",
+        "priceProtect": false,
+        "origType": "LIMIT",
+        "priceMatch": "NONE",
+        "selfTradePreventionMode": "EXPIRE_MAKER",
+        "goodTillDate": 0,
+        "time": 1793999761643,
+        "updateTime": 1793999761643
+      }
+    },
+    {
+      "label": "openOrders (L1 resting)",
+      "reply": [
+        {
+          "orderId": 28668825321,
+          "symbol": "BTCUSDT",
+          "status": "NEW",
+          "clientOrderId": "lx-spike2-l1",
+          "price": "68291.60",
+          "avgPrice": "0",
+          "origQty": "0.0020",
+          "executedQty": "0",
+          "cumQuote": "0.000000",
+          "timeInForce": "GTC",
+          "type": "LIMIT",
+          "reduceOnly": false,
+          "closePosition": false,
+          "side": "BUY",
+          "positionSide": "BOTH",
+          "stopPrice": "0",
+          "workingType": "CONTRACT_PRICE",
+          "priceProtect": false,
+          "origType": "LIMIT",
+          "priceMatch": "NONE",
+          "selfTradePreventionMode": "EXPIRE_MAKER",
+          "goodTillDate": 0,
+          "time": 1793999761643,
+          "strategyType": "",
+          "updateTime": 1793999761643
+        }
+      ]
+    },
+    {
+      "label": "L1 cancel",
+      "reply": {
+        "orderId": 28668825321,
+        "symbol": "BTCUSDT",
+        "status": "CANCELED",
+        "clientOrderId": "lx-spike2-l1",
+        "price": "68291.60",
+        "origQty": "0.0020",
+        "executedQty": "0.0000",
+        "cumQty": "0.0000",
+        "timeInForce": "GTC",
+        "type": "LIMIT",
+        "reduceOnly": false,
+        "closePosition": false,
+        "side": "BUY",
+        "positionSide": "BOTH",
+        "stopPrice": "0.00",
+        "workingType": "CONTRACT_PRICE",
+        "priceProtect": false,
+        "origType": "LIMIT",
+        "priceMatch": "NONE",
+        "selfTradePreventionMode": "EXPIRE_MAKER",
+        "goodTillDate": 0,
+        "updateTime": 1793999766287
+      }
+    },
+    {
+      "label": "L1 query (cancelled)",
+      "reply": {
+        "orderId": 28668825321,
+        "symbol": "BTCUSDT",
+        "status": "CANCELED",
+        "clientOrderId": "lx-spike2-l1",
+        "price": "68291.60",
+        "avgPrice": "0.00",
+        "origQty": "0.0020",
+        "executedQty": "0.0000",
+        "cumQuote": "0.000000",
+        "timeInForce": "GTC",
+        "type": "LIMIT",
+        "reduceOnly": false,
+        "closePosition": false,
+        "side": "BUY",
+        "positionSide": "BOTH",
+        "stopPrice": "0.00",
+        "workingType": "CONTRACT_PRICE",
+        "priceProtect": false,
+        "origType": "LIMIT",
+        "priceMatch": "NONE",
+        "selfTradePreventionMode": "EXPIRE_MAKER",
+        "goodTillDate": 0,
+        "time": 1793999761643,
+        "updateTime": 1793999766287
+      }
+    },
+    {
+      "label": "L1 cancel again",
+      "error": {
+        "type": "BinanceAPIError",
+        "detail": "Binance rejected the request (HTTP 400, code -2011): Unknown order sent.",
+        "code": -2011
+      }
+    },
+    {
+      "label": "L2 place marketable LIMIT BUY",
+      "reply": {
+        "orderId": 28668825451,
+        "symbol": "BTCUSDT",
+        "status": "FILLED",
+        "clientOrderId": "lx-spike2-l2",
+        "price": "76026.20",
+        "origQty": "0.0020",
+        "executedQty": "0.0020",
+        "cumQty": "0.0020",
+        "timeInForce": "GTC",
+        "type": "LIMIT",
+        "reduceOnly": false,
+        "closePosition": false,
+        "side": "BUY",
+        "positionSide": "BOTH",
+        "stopPrice": "0.00",
+        "workingType": "CONTRACT_PRICE",
+        "priceProtect": false,
+        "origType": "LIMIT",
+        "priceMatch": "NONE",
+        "selfTradePreventionMode": "EXPIRE_MAKER",
+        "goodTillDate": 0,
+        "updateTime": 1793999771067
+      }
+    },
+    {
+      "label": "L2 query (filled)",
+      "reply": {
+        "orderId": 28668825451,
+        "symbol": "BTCUSDT",
+        "status": "FILLED",
+        "clientOrderId": "lx-spike2-l2",
+        "price": "76026.20",
+        "avgPrice": "75879.600000",
+        "origQty": "0.0020",
+        "executedQty": "0.0020",
+        "cumQuote": "151.759200",
+        "timeInForce": "GTC",
+        "type": "LIMIT",
+        "reduceOnly": false,
+        "closePosition": false,
+        "side": "BUY",
+        "positionSide": "BOTH",
+        "stopPrice": "0.00",
+        "workingType": "CONTRACT_PRICE",
+        "priceProtect": false,
+        "origType": "LIMIT",
+        "priceMatch": "NONE",
+        "selfTradePreventionMode": "EXPIRE_MAKER",
+        "goodTillDate": 0,
+        "time": 1793999771067,
+        "updateTime": 1793999771067
+      }
+    },
+    {
+      "label": "positionRisk (open)",
+      "reply": [
+        {
+          "symbol": "BTCUSDT",
+          "positionSide": "BOTH",
+          "positionAmt": "0.0020",
+          "entryPrice": "75879.6",
+          "breakEvenPrice": "75909.95184000001",
+          "markPrice": "75874.50000000",
+          "unRealizedProfit": "-0.01020000",
+          "liquidationPrice": "0",
+          "isolatedMargin": "0",
+          "notional": "151.74900000",
+          "marginAsset": "USDT",
+          "isolatedWallet": "0",
+          "initialMargin": "30.34980000",
+          "maintMargin": "0.60699600",
+          "positionInitialMargin": "30.34980000",
+          "openOrderInitialMargin": "0",
+          "adl": 0,
+          "bidNotional": "0",
+          "askNotional": "0",
+          "updateTime": 1793999771095
+        }
+      ]
+    },
+    {
+      "label": "L2 cancel (already filled)",
+      "error": {
+        "type": "BinanceAPIError",
+        "detail": "Binance rejected the request (HTTP 400, code -2011): Unknown order sent.",
+        "code": -2011
+      }
+    },
+    {
+      "label": "close reduce-only",
+      "reply": {
+        "orderId": 28668825519,
+        "symbol": "BTCUSDT",
+        "status": "FILLED",
+        "clientOrderId": "lx-spike2-x",
+        "price": "0.00",
+        "origQty": "0.0020",
+        "executedQty": "0.0020",
+        "cumQty": "0.0020",
+        "timeInForce": "GTC",
+        "type": "MARKET",
+        "reduceOnly": true,
+        "closePosition": false,
+        "side": "SELL",
+        "positionSide": "BOTH",
+        "stopPrice": "0.00",
+        "workingType": "CONTRACT_PRICE",
+        "priceProtect": false,
+        "origType": "MARKET",
+        "priceMatch": "NONE",
+        "selfTradePreventionMode": "EXPIRE_MAKER",
+        "goodTillDate": 0,
+        "updateTime": 1793999776803
+      }
+    },
+    {
+      "label": "cleanup cancel all open orders",
+      "reply": {
+        "code": 200,
+        "msg": "The operation of cancel all open order is done."
+      }
+    },
+    {
+      "label": "cleanup cancel all algo",
+      "reply": {
+        "code": 200,
+        "msg": "The operation of cancel all open order is done."
+      }
+    }
+  ],
+  "user_events": [
+    {
+      "e": "ORDER_TRADE_UPDATE",
+      "T": 1793999761643,
+      "E": 1793999761659,
+      "o": {
+        "s": "BTCUSDT",
+        "c": "lx-spike2-l1",
+        "S": "BUY",
+        "o": "LIMIT",
+        "f": "GTC",
+        "q": "0.002",
+        "p": "68291.6",
+        "ap": "0",
+        "sp": "0",
+        "x": "NEW",
+        "X": "NEW",
+        "i": 28668825321,
+        "l": "0",
+        "z": "0",
+        "L": "0",
+        "n": "0",
+        "N": "USDT",
+        "T": 1793999761643,
+        "t": 0,
+        "b": "136.5832",
+        "a": "0",
+        "m": false,
+        "R": false,
+        "wt": "CONTRACT_PRICE",
+        "ot": "LIMIT",
+        "ps": "BOTH",
+        "cp": false,
+        "rp": "0",
+        "pP": false,
+        "si": 0,
+        "ss": 0,
+        "V": "EXPIRE_MAKER",
+        "pm": "NONE",
+        "gtd": 0,
+        "er": "0"
+      }
+    },
+    {
+      "e": "ORDER_TRADE_UPDATE",
+      "T": 1793999766287,
+      "E": 1793999766303,
+      "o": {
+        "s": "BTCUSDT",
+        "c": "lx-spike2-l1",
+        "S": "BUY",
+        "o": "LIMIT",
+        "f": "GTC",
+        "q": "0.002",
+        "p": "68291.6",
+        "ap": "0",
+        "sp": "0",
+        "x": "CANCELED",
+        "X": "CANCELED",
+        "i": 28668825321,
+        "l": "0",
+        "z": "0",
+        "L": "0",
+        "n": "0",
+        "N": "USDT",
+        "T": 1793999766287,
+        "t": 0,
+        "b": "0",
+        "a": "0",
+        "m": false,
+        "R": false,
+        "wt": "CONTRACT_PRICE",
+        "ot": "LIMIT",
+        "ps": "BOTH",
+        "cp": false,
+        "rp": "0",
+        "pP": false,
+        "si": 0,
+        "ss": 0,
+        "V": "EXPIRE_MAKER",
+        "pm": "NONE",
+        "gtd": 0,
+        "er": "0"
+      }
+    },
+    {
+      "e": "TRADE_LITE",
+      "E": 1793999771095,
+      "T": 1793999771067,
+      "s": "BTCUSDT",
+      "q": "0.0020",
+      "p": "76026.20",
+      "m": false,
+      "c": "lx-spike2-l2",
+      "S": "BUY",
+      "L": "75879.60",
+      "l": "0.0020",
+      "t": 555026491,
+      "i": 28668825451
+    },
+    {
+      "e": "ORDER_TRADE_UPDATE",
+      "T": 1793999771067,
+      "E": 1793999771095,
+      "o": {
+        "s": "BTCUSDT",
+        "c": "lx-spike2-l2",
+        "S": "BUY",
+        "o": "LIMIT",
+        "f": "GTC",
+        "q": "0.002",
+        "p": "76026.2",
+        "ap": "0",
+        "sp": "0",
+        "x": "NEW",
+        "X": "NEW",
+        "i": 28668825451,
+        "l": "0",
+        "z": "0",
+        "L": "0",
+        "n": "0",
+        "N": "USDT",
+        "T": 1793999771067,
+        "t": 0,
+        "b": "152.0524",
+        "a": "0",
+        "m": false,
+        "R": false,
+        "wt": "CONTRACT_PRICE",
+        "ot": "LIMIT",
+        "ps": "BOTH",
+        "cp": false,
+        "rp": "0",
+        "pP": false,
+        "si": 0,
+        "ss": 0,
+        "V": "EXPIRE_MAKER",
+        "pm": "NONE",
+        "gtd": 0,
+        "er": "0"
+      }
+    },
+    {
+      "e": "ACCOUNT_UPDATE",
+      "T": 1793999771095,
+      "E": 1793999771095,
+      "a": {
+        "B": [
+          {
+            "a": "USDT",
+            "wb": "4998.38275393",
+            "cw": "4998.38275393",
+            "bc": "0"
+          }
+        ],
+        "P": [
+          {
+            "s": "BTCUSDT",
+            "pa": "0.002",
+            "ep": "75879.6",
+            "cr": "0.13920001",
+            "up": "0",
+            "mt": "cross",
+            "iw": "0",
+            "ps": "BOTH",
+            "ma": "USDT",
+            "bep": "75909.95184000001"
+          }
+        ],
+        "m": "ORDER"
+      }
+    },
+    {
+      "e": "ORDER_TRADE_UPDATE",
+      "T": 1793999771067,
+      "E": 1793999771095,
+      "o": {
+        "s": "BTCUSDT",
+        "c": "lx-spike2-l2",
+        "S": "BUY",
+        "o": "LIMIT",
+        "f": "GTC",
+        "q": "0.002",
+        "p": "76026.2",
+        "ap": "75879.6",
+        "sp": "0",
+        "x": "TRADE",
+        "X": "FILLED",
+        "i": 28668825451,
+        "l": "0.002",
+        "z": "0.002",
+        "L": "75879.6",
+        "n": "0.06070368",
+        "N": "USDT",
+        "T": 1793999771067,
+        "t": 555026491,
+        "b": "0",
+        "a": "0",
+        "m": false,
+        "R": false,
+        "wt": "CONTRACT_PRICE",
+        "ot": "LIMIT",
+        "ps": "BOTH",
+        "cp": false,
+        "rp": "0",
+        "pP": false,
+        "si": 0,
+        "ss": 0,
+        "V": "EXPIRE_MAKER",
+        "pm": "NONE",
+        "gtd": 0,
+        "er": "0"
+      }
+    },
+    {
+      "e": "TRADE_LITE",
+      "E": 1793999776813,
+      "T": 1793999776803,
+      "s": "BTCUSDT",
+      "q": "0.0020",
+      "p": "0.00",
+      "m": false,
+      "c": "lx-spike2-x",
+      "S": "SELL",
+      "L": "75874.50",
+      "l": "0.0020",
+      "t": 555026500,
+      "i": 28668825519
+    },
+    {
+      "e": "ORDER_TRADE_UPDATE",
+      "T": 1793999776803,
+      "E": 1793999776813,
+      "o": {
+        "s": "BTCUSDT",
+        "c": "lx-spike2-x",
+        "S": "SELL",
+        "o": "MARKET",
+        "f": "GTC",
+        "q": "0.002",
+        "p": "0",
+        "ap": "0",
+        "sp": "0",
+        "x": "NEW",
+        "X": "NEW",
+        "i": 28668825519,
+        "l": "0",
+        "z": "0",
+        "L": "0",
+        "n": "0",
+        "N": "USDT",
+        "T": 1793999776803,
+        "t": 0,
+        "b": "0",
+        "a": "0",
+        "m": false,
+        "R": true,
+        "wt": "CONTRACT_PRICE",
+        "ot": "MARKET",
+        "ps": "BOTH",
+        "cp": false,
+        "rp": "0",
+        "pP": false,
+        "si": 0,
+        "ss": 0,
+        "V": "EXPIRE_MAKER",
+        "pm": "NONE",
+        "gtd": 0,
+        "er": "0"
+      }
+    },
+    {
+      "e": "ACCOUNT_UPDATE",
+      "T": 1793999776813,
+      "E": 1793999776813,
+      "a": {
+        "B": [
+          {
+            "a": "USDT",
+            "wb": "4998.31185433",
+            "cw": "4998.31185433",
+            "bc": "0"
+          }
+        ],
+        "P": [
+          {
+            "s": "BTCUSDT",
+            "pa": "0",
+            "ep": "0",
+            "cr": "0.12900001",
+            "up": "0",
+            "mt": "cross",
+            "iw": "0",
+            "ps": "BOTH",
+            "ma": "USDT",
+            "bep": "0"
+          }
+        ],
+        "m": "ORDER"
+      }
+    },
+    {
+      "e": "ORDER_TRADE_UPDATE",
+      "T": 1793999776803,
+      "E": 1793999776813,
+      "o": {
+        "s": "BTCUSDT",
+        "c": "lx-spike2-x",
+        "S": "SELL",
+        "o": "MARKET",
+        "f": "GTC",
+        "q": "0.002",
+        "p": "0",
+        "ap": "75874.5",
+        "sp": "0",
+        "x": "TRADE",
+        "X": "FILLED",
+        "i": 28668825519,
+        "l": "0.002",
+        "z": "0.002",
+        "L": "75874.5",
+        "n": "0.0606996",
+        "N": "USDT",
+        "T": 1793999776803,
+        "t": 555026500,
+        "b": "0",
+        "a": "0",
+        "m": false,
+        "R": true,
+        "wt": "CONTRACT_PRICE",
+        "ot": "MARKET",
+        "ps": "BOTH",
+        "cp": false,
+        "rp": "-0.0102",
+        "pP": false,
+        "si": 0,
+        "ss": 0,
+        "V": "EXPIRE_MAKER",
+        "pm": "NONE",
+        "gtd": 0,
+        "er": "0"
+      }
+    }
+  ],
+  "market": {
+    "ws single": {
+      "url": "wss://demo-fstream.binance.com/ws/btcusdt@markPrice@1s",
+      "messages": [
+        {
+          "e": "markPriceUpdate",
+          "E": 1793999730000,
+          "s": "BTCUSDT",
+          "p": "75869.50000000",
+          "ap": "75869.50000000",
+          "P": "75889.78780254",
+          "i": "75903.83065217",
+          "r": "0.00010000",
+          "T": 1794009600000,
+          "st": 1
+        },
+        {
+          "e": "markPriceUpdate",
+          "E": 1793999731000,
+          "s": "BTCUSDT",
+          "p": "75875.92125000",
+          "ap": "75875.92125000",
+          "P": "75889.80888456",
+          "i": "75911.95260870",
+          "r": "0.00010000",
+          "T": 1794009600000,
+          "st": 1
+        },
+        {
+          "e": "markPriceUpdate",
+          "E": 1793999732000,
+          "s": "BTCUSDT",
+          "p": "75876.01255435",
+          "ap": "75876.01255435",
+          "P": "75889.81874369",
+          "i": "75912.04391304",
+          "r": "0.00010000",
+          "T": 1794009600000,
+          "st": 1
+        }
+      ]
+    },
+    "public ws single": {
+      "url": "wss://demo-fstream.binance.com/public/ws/btcusdt@markPrice@1s",
+      "messages": [
+        {
+          "e": "markPriceUpdate",
+          "E": 1793999734000,
+          "s": "BTCUSDT",
+          "p": "75876.56907609",
+          "ap": "75876.56907609",
+          "P": "75889.83916230",
+          "i": "75912.60043478",
+          "r": "0.00010000",
+          "T": 1794009600000,
+          "st": 1
+        },
+        {
+          "e": "markPriceUpdate",
+          "E": 1793999735000,
+          "s": "BTCUSDT",
+          "p": "75876.66255435",
+          "ap": "75876.66255435",
+          "P": "75889.85276272",
+          "i": "75912.69391304",
+          "r": "0.00010000",
+          "T": 1794009600000,
+          "st": 1
+        },
+        {
+          "e": "markPriceUpdate",
+          "E": 1793999736000,
+          "s": "BTCUSDT",
+          "p": "75876.66255435",
+          "ap": "75876.66255435",
+          "P": "75889.86635987",
+          "i": "75912.69391304",
+          "r": "0.00010000",
+          "T": 1794009600000,
+          "st": 1
+        }
+      ]
+    },
+    "market ws single": {
+      "url": "wss://demo-fstream.binance.com/market/ws/btcusdt@markPrice@1s",
+      "messages": [
+        {
+          "e": "markPriceUpdate",
+          "E": 1793999738000,
+          "s": "BTCUSDT",
+          "p": "75873.55063406",
+          "ap": "75873.55063406",
+          "P": "75889.89257466",
+          "i": "75910.37913043",
+          "r": "0.00010000",
+          "T": 1794009600000,
+          "st": 1
+        },
+        {
+          "e": "markPriceUpdate",
+          "E": 1793999739000,
+          "s": "BTCUSDT",
+          "p": "75873.47215580",
+          "ap": "75873.47215580",
+          "P": "75889.90508015",
+          "i": "75910.30065217",
+          "r": "0.00010000",
+          "T": 1794009600000,
+          "st": 1
+        },
+        {
+          "e": "markPriceUpdate",
+          "E": 1793999740000,
+          "s": "BTCUSDT",
+          "p": "75873.46563406",
+          "ap": "75873.46563406",
+          "P": "75889.91758926",
+          "i": "75910.29413043",
+          "r": "0.00010000",
+          "T": 1794009600000,
+          "st": 1
+        }
+      ]
+    },
+    "combined stream": {
+      "url": "wss://demo-fstream.binance.com/stream?streams=btcusdt@markPrice@1s/ethusdt@markPrice@1s",
+      "messages": [
+        {
+          "stream": "btcusdt@markPrice@1s",
+          "data": {
+            "e": "markPriceUpdate",
+            "E": 1793999742000,
+            "s": "BTCUSDT",
+            "p": "75873.47432971",
+            "ap": "75873.47432971",
+            "P": "75889.94446467",
+            "i": "75910.30282609",
+            "r": "0.00010000",
+            "T": 1794009600000,
+            "st": 1
+          }
+        },
+        {
+          "stream": "ethusdt@markPrice@1s",
+          "data": {
+            "e": "markPriceUpdate",
+            "E": 1793999742000,
+            "s": "ETHUSDT",
+            "p": "2230.83000000",
+            "ap": "2230.83000000",
+            "P": "2231.23729181",
+            "i": "2231.55767442",
+            "r": "0.00010000",
+            "T": 1794009600000,
+            "st": 1
+          }
+        },
+        {
+          "stream": "btcusdt@markPrice@1s",
+          "data": {
+            "e": "markPriceUpdate",
+            "E": 1793999743001,
+            "s": "BTCUSDT",
+            "p": "75873.44240942",
+            "ap": "75873.44240942",
+            "P": "75889.95911280",
+            "i": "75910.30282609",
+            "r": "0.00010000",
+            "T": 1794009600000,
+            "st": 1
+          }
+        },
+        {
+          "stream": "ethusdt@markPrice@1s",
+          "data": {
+            "e": "markPriceUpdate",
+            "E": 1793999743001,
+            "s": "ETHUSDT",
+            "p": "2230.84000000",
+            "ap": "2230.84000000",
+            "P": "2231.23588837",
+            "i": "2231.55720930",
+            "r": "0.00010000",
+            "T": 1794009600000,
+            "st": 1
+          }
+        }
+      ]
+    },
+    "ws subscribe eth": {
+      "url": "wss://demo-fstream.binance.com/ws/btcusdt@markPrice@1s",
+      "messages": [
+        {
+          "result": null,
+          "id": 7
+        },
+        {
+          "e": "markPriceUpdate",
+          "E": 1793999746000,
+          "s": "BTCUSDT",
+          "p": "75873.44893116",
+          "ap": "75873.44893116",
+          "P": "75889.98182029",
+          "i": "75910.30934783",
+          "r": "0.00010000",
+          "T": 1794009600000,
+          "st": 1
+        },
+        {
+          "e": "markPriceUpdate",
+          "E": 1793999746000,
+          "s": "ETHUSDT",
+          "p": "2230.84000000",
+          "ap": "2230.84000000",
+          "P": "2231.23438579",
+          "i": "2231.55325581",
+          "r": "0.00010000",
+          "T": 1794009600000,
+          "st": 1
+        },
+        {
+          "e": "markPriceUpdate",
+          "E": 1793999747000,
+          "s": "BTCUSDT",
+          "p": "75873.44893116",
+          "ap": "75873.44893116",
+          "P": "75889.99244034",
+          "i": "75910.30934783",
+          "r": "0.00010000",
+          "T": 1794009600000,
+          "st": 1
+        },
+        {
+          "e": "markPriceUpdate",
+          "E": 1793999747000,
+          "s": "ETHUSDT",
+          "p": "2230.84000000",
+          "ap": "2230.84000000",
+          "P": "2231.23357584",
+          "i": "2231.55395349",
+          "r": "0.00010000",
+          "T": 1794009600000,
+          "st": 1
+        },
+        {
+          "e": "markPriceUpdate",
+          "E": 1793999748000,
+          "s": "BTCUSDT",
+          "p": "75873.60000000",
+          "ap": "75873.60000000",
+          "P": "75890.01267726",
+          "i": "75910.30934783",
+          "r": "0.00010000",
+          "T": 1794009600000,
+          "st": 1
+        }
+      ]
+    }
+  },
+  "notes": [
+    "=== market streams ===",
+    "tickSize 0.10",
+    "=== resting limit ===",
+    "=== marketable limit ===",
+    "final position 0"
+  ]
+}
