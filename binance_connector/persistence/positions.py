@@ -130,9 +130,22 @@ class PositionEvent:
 class PositionRepository:
     """All database access for positions. Safe to use from several threads and processes."""
 
-    def __init__(self, session_factory: sessionmaker[Session], clock: Callable[[], datetime] = utc_now) -> None:
+    def __init__(
+        self,
+        session_factory: sessionmaker[Session],
+        clock: Callable[[], datetime] = utc_now,
+        outbox: Any | None = None,
+    ) -> None:
+        """``outbox`` (a ``ReportOutbox``) writes reports in the same transaction as each change."""
         self._session_factory = session_factory
         self._clock = clock
+        self._outbox = outbox
+
+    def _report(self, session: Session, record: PositionRecord, event_type: str) -> None:
+        """Write a report for this change inside the current transaction (if reporting is on)."""
+        if self._outbox is not None:
+            session.flush()
+            self._outbox.position_changed(session, _snapshot(session, record), event_type)
 
     # --- creating -----------------------------------------------------------------------------
 
@@ -155,6 +168,7 @@ class PositionRepository:
                 session.add(record)
                 session.flush()  # the history row references the position
                 session.add(_event(new_position.position_id, now, "STATE_CHANGED", None, PositionState.OPENING, None))
+                self._report(session, record, "POSITION_OPENING")
                 session.commit()
             except IntegrityError as error:
                 session.rollback()
@@ -237,17 +251,27 @@ class PositionRepository:
                 record.active_symbol = None
             record.updated_at = self._clock()
             session.add(_event(position_id, self._clock(), "STATE_CHANGED", current_state, target_state, event_detail))
+            self._report(session, record, f"POSITION_{target_state.value}")
 
         return self._write(position_id, change)
 
-    def update_fields(self, position_id: str, event_detail: dict[str, Any] | None = None, **field_updates: Any) -> Position:
-        """Set fields without a state change. Recorded as an event."""
+    def update_fields(
+        self,
+        position_id: str,
+        event_detail: dict[str, Any] | None = None,
+        report_event: str | None = None,
+        **field_updates: Any,
+    ) -> Position:
+        """Set fields without a state change. Recorded as an event; reported if ``report_event``
+        is given (e.g. a correction of a CLOSED position's close reason)."""
 
         def change(session: Session, record: PositionRecord) -> None:
             _apply(record, field_updates)
             record.updated_at = self._clock()
             detail = {"fields": field_updates, **(event_detail or {})}
             session.add(_event(position_id, self._clock(), "FIELDS_UPDATED", None, None, detail))
+            if report_event is not None:
+                self._report(session, record, report_event)
 
         return self._write(position_id, change)
 
@@ -323,6 +347,7 @@ class PositionRepository:
                     updates.pop(field_name, None)
             if status_only_if is not None and row.status != status_only_if:
                 updates.pop("status", None)
+            status_before = row.status
             for field_name, value in updates.items():
                 if field_name not in ExecutionRecordRow.__mapper__.columns or field_name in ("id", "position_id",
                                                                                              "role", "client_id"):
@@ -331,6 +356,8 @@ class PositionRepository:
             row.updated_at = self._clock()
             detail = {"execution": role.name, "fields": updates, **(event_detail or {})}
             session.add(_event(position_id, self._clock(), "EXECUTION_UPDATED", None, None, detail))
+            if role in (ExecutionRole.TAKE_PROFIT, ExecutionRole.STOP_LOSS) and row.status != status_before:
+                self._report(session, record, "PROTECTION_UPDATED")
 
         return self._write(position_id, change)
 

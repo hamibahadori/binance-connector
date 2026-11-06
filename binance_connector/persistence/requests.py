@@ -63,9 +63,16 @@ class Request:
 
 
 class RequestRepository:
-    def __init__(self, session_factory: sessionmaker[Session], clock: Callable[[], datetime] = utc_now) -> None:
+    def __init__(
+        self,
+        session_factory: sessionmaker[Session],
+        clock: Callable[[], datetime] = utc_now,
+        outbox: Any | None = None,
+    ) -> None:
+        """``outbox`` (a ``ReportOutbox``) reports ACCEPTED/REJECTED in the same transaction."""
         self._session_factory = session_factory
         self._clock = clock
+        self._outbox = outbox
 
     def create(self, new_request: NewRequest) -> Request:
         """Store a new request as RECEIVED.
@@ -135,6 +142,8 @@ class RequestRepository:
                 record.position_id = position_id
             if response is not None:
                 record.response = to_json(response)
+            if self._outbox is not None and target_status in DECIDED_STATUSES:
+                self._outbox.request_decided(_session, _snapshot(record))
 
         return write_with_retry(self._session_factory, lambda session: self._load(session, request_id), change,
                                 lambda _session, record: _snapshot(record))

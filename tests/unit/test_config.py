@@ -99,6 +99,46 @@ def test_invalid_values_are_rejected(variable, bad_value):
         Settings.from_environment({**REQUIRED_ENVIRONMENT, variable: bad_value})
 
 
+def test_report_and_websocket_settings_have_safe_defaults():
+    settings = Settings.from_environment(REQUIRED_ENVIRONMENT)
+
+    assert settings.django_report_url is None
+    assert settings.django_report_auth_header == "Authorization"
+    assert settings.django_report_auth_value is None
+    assert settings.django_report_timeout_seconds == 10.0
+    assert settings.django_report_max_attempts == 10
+    assert (settings.websocket_host, settings.websocket_port, settings.websocket_token) == ("127.0.0.1", 8765, None)
+
+
+def test_report_and_websocket_settings_are_read():
+    settings = Settings.from_environment({
+        **REQUIRED_ENVIRONMENT,
+        "DJANGO_REPORT_URL": "https://django.test/reports/",
+        "DJANGO_REPORT_AUTH_HEADER": "X-Api-Key",
+        "DJANGO_REPORT_AUTH_VALUE": "django-secret",
+        "DJANGO_REPORT_TIMEOUT_SECONDS": "5",
+        "DJANGO_REPORT_MAX_ATTEMPTS": "4",
+        "WEBSOCKET_HOST": "0.0.0.0",
+        "WEBSOCKET_PORT": "9001",
+        "WEBSOCKET_TOKEN": "ws-secret",
+    })
+
+    assert settings.django_report_url == "https://django.test/reports/"
+    assert settings.django_report_auth_header == "X-Api-Key"
+    assert settings.django_report_auth_value == "django-secret"
+    assert settings.django_report_timeout_seconds == 5.0
+    assert settings.django_report_max_attempts == 4
+    assert (settings.websocket_host, settings.websocket_port, settings.websocket_token) == ("0.0.0.0", 9001, "ws-secret")
+    assert "django-secret" not in repr(settings) and "ws-secret" not in repr(settings)
+
+
+@pytest.mark.parametrize(("variable", "bad_value"), [("WEBSOCKET_PORT", "0"), ("WEBSOCKET_PORT", "70000"),
+                                                     ("DJANGO_REPORT_MAX_ATTEMPTS", "0")])
+def test_invalid_report_and_websocket_values_are_rejected(variable, bad_value):
+    with pytest.raises(ConfigurationError, match=variable):
+        Settings.from_environment({**REQUIRED_ENVIRONMENT, variable: bad_value})
+
+
 def test_an_empty_inbound_token_means_no_token():
     settings = Settings.from_environment({**REQUIRED_ENVIRONMENT, "INBOUND_API_TOKEN": "  "})
 

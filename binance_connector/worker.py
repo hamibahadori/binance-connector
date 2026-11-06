@@ -16,6 +16,8 @@ Threads:
   whole account is reconciled after every (re)connect and every ``RECONCILE_INTERVAL_SECONDS``.
 * **price feed** (``PriceFeed``): one market stream with the mark price of every symbol that
   has an active position, stored for the API and passed to listeners.
+* **report dispatcher** (``ReportDispatcher``): delivers the report outbox to Django, in
+  order per position, retrying until ``DJANGO_REPORT_MAX_ATTEMPTS``.
 
 Ctrl+C or SIGTERM stops the loop, then every stream, then the pool (running requests finish).
 """
@@ -37,6 +39,7 @@ from binance_connector.services.execution_manager import ExecutionManager
 from binance_connector.services.position_manager import PositionManager
 from binance_connector.services.price_feed import PriceFeed
 from binance_connector.services.reconciliation import ReconciliationService
+from binance_connector.services.reporting import ReportDispatcher
 from binance_connector.services.stream_events import UserDataEventHandler
 
 logger = logging.getLogger(__name__)
@@ -299,9 +302,12 @@ def build_worker(settings: Settings) -> WorkerProcess:
         symbols=lambda: {position.symbol for position in components.positions.list_active()},
         stream_url=settings.market_stream_url,
     )
+    report_dispatcher = ReportDispatcher(reports=components.reports, error_logs=components.error_logs,
+                                         settings=settings)
     return WorkerProcess(positions=components.positions, execution_manager=execution_manager,
                          position_manager=position_manager, stream_factory=stream_factory,
-                         background_tasks=[price_feed.run], price_feed=price_feed, on_shutdown=release_resources)
+                         background_tasks=[price_feed.run, report_dispatcher.run], price_feed=price_feed,
+                         on_shutdown=release_resources)
 
 
 def main() -> None:

@@ -12,6 +12,7 @@ from binance_connector.persistence.database import create_database_engine, creat
 from binance_connector.persistence.error_logs import ErrorLogRepository
 from binance_connector.persistence.market_data import MarketDataRepository
 from binance_connector.persistence.positions import PositionRepository
+from binance_connector.persistence.reports import ReportOutbox, ReportRepository
 from binance_connector.persistence.requests import RequestRepository
 from binance_connector.persistence.schema import ensure_schema_is_current
 from binance_connector.security.credentials import CredentialCipher
@@ -28,6 +29,7 @@ class Components:
     positions: PositionRepository
     error_logs: ErrorLogRepository
     market_data: MarketDataRepository
+    reports: ReportRepository
 
 
 def load_settings() -> Settings:
@@ -46,12 +48,14 @@ def build_components(settings: Settings) -> Components:
     engine = create_database_engine(settings.database_url)
     ensure_schema_is_current(engine)
     session_factory = create_session_factory(engine)
+    outbox = ReportOutbox()  # every reported change writes its report in the same transaction
     return Components(
         settings=settings,
         engine=engine,
         accounts=AccountRepository(session_factory, cipher=CredentialCipher(settings.credentials_encryption_key)),
-        requests=RequestRepository(session_factory),
-        positions=PositionRepository(session_factory),
+        requests=RequestRepository(session_factory, outbox=outbox),
+        positions=PositionRepository(session_factory, outbox=outbox),
         error_logs=ErrorLogRepository(session_factory),
         market_data=MarketDataRepository(session_factory),
+        reports=ReportRepository(session_factory),
     )

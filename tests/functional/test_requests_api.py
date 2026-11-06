@@ -46,6 +46,17 @@ def test_an_accepted_open_returns_202_and_its_receipt(http_client, market):
     assert receipt["position"]["state"] == "OPENING"
 
 
+def test_an_accepted_open_leaves_its_reports_in_the_outbox_for_django(app, http_client, market):
+    position_id = http_client.post(REQUESTS_URL, json=open_body()).get_json()["position_id"]
+
+    stored_reports = app.extensions["components"].reports.all()
+
+    assert [report.event_type for report in stored_reports] == ["POSITION_OPENING", "REQUEST_ACCEPTED"]
+    assert {report.position_id for report in stored_reports} == {position_id}
+    assert {report.status for report in stored_reports} == {"PENDING"}
+    assert "demo-api-secret-0001" not in "".join(report.payload for report in stored_reports)
+
+
 def test_a_rejected_open_returns_422_with_reasons(http_client, market):
     response = http_client.post(REQUESTS_URL, json=open_body(quantity="0.0005"))
 

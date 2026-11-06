@@ -377,6 +377,7 @@ class PositionManager:
             if position.close_reason is CloseReason.EXTERNAL:
                 return self._positions.update_fields(
                     position_id, event_detail={"correction": "a TP/SL fill explains the close"},
+                    report_event="POSITION_CLOSED",
                     close_reason=reason, exit_average_price=exit_average_price, closed_at=closed_at,
                     realized_pnl=_realized(position, exit_average_price), last_error=None,
                 )

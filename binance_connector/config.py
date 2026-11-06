@@ -41,6 +41,14 @@ DEFAULT_RECONCILE_INTERVAL_SECONDS = 60.0
 DEFAULT_LIMIT_ENTRY_TIMEOUT_SECONDS = 300.0
 DEFAULT_EXECUTION_WORKERS = 4
 
+DEFAULT_REPORT_AUTH_HEADER = "Authorization"
+DEFAULT_REPORT_TIMEOUT_SECONDS = 10.0
+DEFAULT_REPORT_MAX_ATTEMPTS = 10
+
+DEFAULT_WEBSOCKET_HOST = "127.0.0.1"
+"""Local only by default: exposing the live feed beyond this machine is a deliberate choice."""
+DEFAULT_WEBSOCKET_PORT = 8765
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -63,6 +71,14 @@ class Settings:
     price_guard_max_deviation_percent: Decimal | None = None
     execution_workers: int = DEFAULT_EXECUTION_WORKERS
     inbound_api_token: str | None = field(default=None, repr=False)
+    django_report_url: str | None = None
+    django_report_auth_header: str = DEFAULT_REPORT_AUTH_HEADER
+    django_report_auth_value: str | None = field(default=None, repr=False)
+    django_report_timeout_seconds: float = DEFAULT_REPORT_TIMEOUT_SECONDS
+    django_report_max_attempts: int = DEFAULT_REPORT_MAX_ATTEMPTS
+    websocket_host: str = DEFAULT_WEBSOCKET_HOST
+    websocket_port: int = DEFAULT_WEBSOCKET_PORT
+    websocket_token: str | None = field(default=None, repr=False)
 
     @classmethod
     def from_environment(cls, environment: Mapping[str, str]) -> "Settings":
@@ -89,6 +105,19 @@ class Settings:
             price_guard_max_deviation_percent=_read_optional_percent(environment, "PRICE_GUARD_MAX_DEVIATION_PERCENT"),
             execution_workers=_read_positive_integer(environment, "EXECUTION_WORKERS", DEFAULT_EXECUTION_WORKERS),
             inbound_api_token=environment.get("INBOUND_API_TOKEN", "").strip() or None,
+            django_report_url=environment.get("DJANGO_REPORT_URL", "").strip() or None,
+            django_report_auth_header=environment.get("DJANGO_REPORT_AUTH_HEADER", "").strip()
+            or DEFAULT_REPORT_AUTH_HEADER,
+            django_report_auth_value=environment.get("DJANGO_REPORT_AUTH_VALUE", "").strip() or None,
+            django_report_timeout_seconds=_read_positive_number(
+                environment, "DJANGO_REPORT_TIMEOUT_SECONDS", DEFAULT_REPORT_TIMEOUT_SECONDS
+            ),
+            django_report_max_attempts=_read_positive_integer(
+                environment, "DJANGO_REPORT_MAX_ATTEMPTS", DEFAULT_REPORT_MAX_ATTEMPTS
+            ),
+            websocket_host=environment.get("WEBSOCKET_HOST", "").strip() or DEFAULT_WEBSOCKET_HOST,
+            websocket_port=_read_port(environment, "WEBSOCKET_PORT", DEFAULT_WEBSOCKET_PORT),
+            websocket_token=environment.get("WEBSOCKET_TOKEN", "").strip() or None,
         )
 
 
@@ -147,6 +176,13 @@ def _read_positive_integer(environment: Mapping[str, str], variable: str, defaul
     if number <= 0:
         raise ConfigurationError(f"{variable} must be greater than 0, got {number}.")
     return number
+
+
+def _read_port(environment: Mapping[str, str], variable: str, default: int) -> int:
+    port = _read_positive_integer(environment, variable, default)
+    if port > 65535:
+        raise ConfigurationError(f"{variable} must be a TCP port (1-65535), got {port}.")
+    return port
 
 
 def _read_optional_percent(environment: Mapping[str, str], variable: str) -> Decimal | None:
