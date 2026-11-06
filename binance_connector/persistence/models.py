@@ -26,10 +26,15 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import BigInteger, ForeignKey, Integer, String, Text, UniqueConstraint
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, validates
 
 from binance_connector.persistence.types import DecimalString, UtcDateTime
+from binance_connector.security.redaction import REDACTOR
 
+
+def _masked(value: str | None) -> str | None:
+    """``value`` with every registered secret replaced by ``***``."""
+    return REDACTOR.redact(value) if isinstance(value, str) else value
 
 class Base(DeclarativeBase):
     pass
@@ -71,9 +76,14 @@ class RequestRecord(Base):
     decided_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     processed_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     response: Mapped[str | None] = mapped_column(Text)
+
     version: Mapped[int] = mapped_column(Integer, nullable=False)
 
     __mapper_args__ = {"version_id_col": version}
+
+    @validates("payload", "rejection_reasons", "response")
+    def _mask_secrets(self, _column: str, value: str | None) -> str | None:
+        return _masked(value)
 
 
 class PositionRecord(Base):
@@ -112,6 +122,10 @@ class PositionRecord(Base):
 
     __mapper_args__ = {"version_id_col": version}
 
+    @validates("last_error")
+    def _mask_secrets(self, _column: str, value: str | None) -> str | None:
+        return _masked(value)
+
 
 class ExecutionRecordRow(Base):
     __tablename__ = "execution_records"
@@ -139,6 +153,10 @@ class ExecutionRecordRow(Base):
 
     __mapper_args__ = {"version_id_col": version}
 
+    @validates("last_error")
+    def _mask_secrets(self, _column: str, value: str | None) -> str | None:
+        return _masked(value)
+
 
 class PositionEventRecord(Base):
     __tablename__ = "position_events"
@@ -150,6 +168,10 @@ class PositionEventRecord(Base):
     from_state: Mapped[str | None] = mapped_column(String(10))
     to_state: Mapped[str | None] = mapped_column(String(10))
     detail: Mapped[str | None] = mapped_column(Text)
+
+    @validates("detail")
+    def _mask_secrets(self, _column: str, value: str | None) -> str | None:
+        return _masked(value)
 
 
 class ReportRecord(Base):
@@ -169,6 +191,10 @@ class ReportRecord(Base):
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
     sent_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
 
+    @validates("payload", "last_error")
+    def _mask_secrets(self, _column: str, value: str | None) -> str | None:
+        return _masked(value)
+
 
 class ErrorLogRecord(Base):
     __tablename__ = "error_logs"
@@ -181,6 +207,10 @@ class ErrorLogRecord(Base):
     account_id: Mapped[str | None] = mapped_column(String(64))
     request_id: Mapped[str | None] = mapped_column(String(64))
     position_id: Mapped[str | None] = mapped_column(String(24))
+
+    @validates("message", "context")
+    def _mask_secrets(self, _column: str, value: str | None) -> str | None:
+        return _masked(value)
 
 
 class MarketPriceRecord(Base):

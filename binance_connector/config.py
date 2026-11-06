@@ -48,6 +48,9 @@ DEFAULT_REPORT_MAX_ATTEMPTS = 10
 DEFAULT_WEBSOCKET_HOST = "127.0.0.1"
 """Local only by default: exposing the live feed beyond this machine is a deliberate choice."""
 DEFAULT_WEBSOCKET_PORT = 8765
+DEFAULT_API_HOST = "127.0.0.1"
+DEFAULT_API_PORT = 5000
+DEFAULT_API_THREADS = 8
 
 
 @dataclass(frozen=True)
@@ -79,6 +82,9 @@ class Settings:
     websocket_host: str = DEFAULT_WEBSOCKET_HOST
     websocket_port: int = DEFAULT_WEBSOCKET_PORT
     websocket_token: str | None = field(default=None, repr=False)
+    api_host: str = DEFAULT_API_HOST
+    api_port: int = DEFAULT_API_PORT
+    api_threads: int = DEFAULT_API_THREADS
 
     @classmethod
     def from_environment(cls, environment: Mapping[str, str]) -> "Settings":
@@ -118,6 +124,9 @@ class Settings:
             websocket_host=environment.get("WEBSOCKET_HOST", "").strip() or DEFAULT_WEBSOCKET_HOST,
             websocket_port=_read_port(environment, "WEBSOCKET_PORT", DEFAULT_WEBSOCKET_PORT),
             websocket_token=environment.get("WEBSOCKET_TOKEN", "").strip() or None,
+            api_host=environment.get("API_HOST", "").strip() or DEFAULT_API_HOST,
+            api_port=_read_port(environment, "API_PORT", DEFAULT_API_PORT),
+            api_threads=_read_positive_integer(environment, "API_THREADS", DEFAULT_API_THREADS),
         )
 
 

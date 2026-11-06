@@ -17,7 +17,8 @@ CLOSE_REQUEST = "request-close-1"
 @pytest.fixture
 def manager(positions, clients) -> PositionManager:
     return PositionManager(positions=positions, clients=clients, trigger_price_type="MARK_PRICE",
-                           limit_entry_timeout_seconds=300)
+                           limit_entry_timeout_seconds=300,
+                           sleep=lambda _seconds: None)
 
 
 @pytest.fixture
@@ -99,12 +100,12 @@ def test_protection_left_open_by_binance_is_cancelled(manager, clients, open_pos
 
 
 def test_a_rejected_close_leaves_the_position_open(manager, clients, open_position):
-    binance(clients).fail_next("place_market_order", BinanceAPIError(400, -1021, "Timestamp outside recvWindow."))
+    binance(clients).fail_next("place_market_order", BinanceAPIError(400, -2022, "ReduceOnly Order is rejected."))
 
     position = manager.close(POSITION_ID, CLOSE_REQUEST)
 
     assert position.state is PositionState.OPEN
-    assert "-1021" in position.last_error
+    assert "-2022" in position.last_error
 
 
 def test_an_unknown_close_outcome_stays_closing(manager, clients, open_position):

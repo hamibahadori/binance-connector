@@ -150,3 +150,18 @@ def test_secrets_are_hidden_from_repr():
 
     assert ENCRYPTION_KEY not in repr(settings)
     assert "token-from-env" not in repr(settings)
+
+
+def test_api_server_settings_have_defaults_and_can_be_set():
+    defaults = Settings.from_environment(REQUIRED_ENVIRONMENT)
+    chosen = Settings.from_environment({**REQUIRED_ENVIRONMENT, "API_HOST": "0.0.0.0", "API_PORT": "8000",
+                                        "API_THREADS": "16"})
+
+    assert (defaults.api_host, defaults.api_port, defaults.api_threads) == ("127.0.0.1", 5000, 8)
+    assert (chosen.api_host, chosen.api_port, chosen.api_threads) == ("0.0.0.0", 8000, 16)
+
+
+@pytest.mark.parametrize(("variable", "bad_value"), [("API_PORT", "0"), ("API_PORT", "port"), ("API_THREADS", "0")])
+def test_invalid_api_server_values_are_rejected(variable, bad_value):
+    with pytest.raises(ConfigurationError, match=variable):
+        Settings.from_environment({**REQUIRED_ENVIRONMENT, variable: bad_value})

@@ -14,7 +14,8 @@ from tests.support import POSITION_ID, store_position
 @pytest.fixture
 def manager(positions, clients) -> PositionManager:
     return PositionManager(positions=positions, clients=clients, trigger_price_type="MARK_PRICE",
-                           limit_entry_timeout_seconds=300)
+                           limit_entry_timeout_seconds=300,
+                           sleep=lambda _seconds: None)
 
 
 def store(positions, position_id=POSITION_ID, account_id="account-1", **overrides):
@@ -160,7 +161,8 @@ def test_a_rejection_fails_the_position(manager, positions, clients, failing_cal
 
 def test_an_unreachable_binance_fails_the_position(manager, positions, clients):
     store(positions)
-    binance(clients).fail_next("place_market_order", BinanceUnavailableError("no connection"))
+    for _attempt in range(3):  # transient failures are retried; a lasting outage is not
+        binance(clients).fail_next("place_market_order", BinanceUnavailableError("no connection"))
 
     assert manager.open(POSITION_ID).state is PositionState.FAILED
 

@@ -150,3 +150,23 @@ def test_with_a_token_configured_the_right_bearer_token_gets_through(protected_c
 
 def test_health_never_needs_the_token(protected_client):
     assert protected_client.get("/health").status_code == 200
+
+
+# --- database trouble ---------------------------------------------------------------------------
+
+
+def test_an_unavailable_database_answers_503_so_django_can_retry(app, http_client, market, monkeypatch):
+    from sqlalchemy.exc import OperationalError
+
+    def locked(*_arguments, **_keywords):
+        raise OperationalError("INSERT INTO requests ...", {"secret": "demo-api-secret-0001"},
+                               Exception("database is locked"))
+
+    monkeypatch.setattr(app.extensions["components"].requests, "create", locked)
+
+    response = http_client.post(REQUESTS_URL, json=open_body())
+
+    assert response.status_code == 503
+    assert response.get_json()["error"] == "database_unavailable"
+    assert "demo-api-secret-0001" not in response.get_data(as_text=True)
+    assert "INSERT" not in response.get_data(as_text=True)

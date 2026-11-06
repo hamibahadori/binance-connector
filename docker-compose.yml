@@ -1,0 +1,71 @@
+# The whole service: database migration, the API and the worker, sharing one SQLite
+# database on a named volume. Settings come from .env (copy .env.example); the values
+# below override only what has to differ inside a container.
+#
+#   docker compose up --build -d     start (migrates first)
+#   docker compose logs -f           follow the logs
+#   docker compose down              stop (the database volume is kept)
+#
+# The API (5000) and the WebSocket (8765) are published on the host's 127.0.0.1 only.
+# To serve other machines, change "127.0.0.1:" in the ports below, and set
+# INBOUND_API_TOKEN and WEBSOCKET_TOKEN in .env first.
+name: binance-connector
+
+x-service: &service
+  build: .
+  image: binance-connector:local
+  env_file: .env
+  volumes:
+    - data:/data
+  init: true                 # forwards SIGTERM, so the worker shuts down cleanly
+  restart: unless-stopped
+
+services:
+  migrate:
+    <<: *service
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: sqlite:////data/binance_connector.db
+    restart: "no"
+
+  api:
+    <<: *service
+    command: ["python", "-m", "binance_connector.server"]
+    environment:
+      DATABASE_URL: sqlite:////data/binance_connector.db
+      API_HOST: 0.0.0.0
+      API_PORT: "5000"
+    ports:
+      - "127.0.0.1:5000:5000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-m", "binance_connector.healthcheck", "api"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  worker:
+    <<: *service
+    command: ["python", "-m", "binance_connector.worker"]
+    environment:
+      DATABASE_URL: sqlite:////data/binance_connector.db
+      WEBSOCKET_HOST: 0.0.0.0
+      WEBSOCKET_PORT: "8765"
+    ports:
+      - "127.0.0.1:8765:8765"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    stop_grace_period: 30s   # running requests finish before the worker exits
+    healthcheck:
+      test: ["CMD", "python", "-m", "binance_connector.healthcheck", "worker"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  data:

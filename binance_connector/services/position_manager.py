@@ -21,6 +21,7 @@ re-run never sends it twice.
 """
 
 import logging
+import time
 from collections.abc import Callable
 from datetime import datetime
 from decimal import Decimal
@@ -54,6 +55,9 @@ ALREADY_GONE = -2011
 ONE_WAY_POSITION_SIDE = "BOTH"
 LIVE_ORDER_STATUSES = frozenset({"NEW", "PARTIALLY_FILLED"})
 RETRYABLE_STATUSES = frozenset({"PENDING", "REJECTED"})
+OUTSIDE_RECV_WINDOW = -1021
+TRANSIENT_ATTEMPTS = 3
+"""Attempts for a call that failed without executing (see `_retrying`)."""
 """Execution statuses that mean "never reached Binance": safe to (re)send."""
 
 
@@ -71,6 +75,7 @@ class PositionManager:
         limit_entry_timeout_seconds: float,
         error_logs: ErrorLogRepository | None = None,
         clock: Callable[[], datetime] = utc_now,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self._positions = positions
         self._clients = clients
@@ -78,6 +83,7 @@ class PositionManager:
         self._limit_entry_timeout_seconds = limit_entry_timeout_seconds
         self._error_logs = error_logs
         self._clock = clock
+        self._sleep = sleep
 
     # --- open ---------------------------------------------------------------------------------
 
@@ -91,7 +97,7 @@ class PositionManager:
         direction = PositionDirection(position.direction)
 
         try:
-            held_amount = net_position(client, position.symbol)
+            held_amount = self._retrying(lambda: net_position(client, position.symbol))
         except HedgeModeNotSupportedError as error:
             return self._fail(position, str(error))
         except BinanceError as error:
@@ -101,7 +107,7 @@ class PositionManager:
                                         "on Binance, not managed by this service.")
         if position.leverage is not None:
             try:
-                client.change_leverage(symbol=position.symbol, leverage=position.leverage)
+                self._retrying(lambda: client.change_leverage(symbol=position.symbol, leverage=position.leverage))
             except BinanceError as error:
                 return self._fail(position, f"The leverage could not be set: {error}")
 
@@ -114,12 +120,13 @@ class PositionManager:
                                          submitted_at=self._clock(), last_error=None)
         try:
             if is_limit:
-                reply = client.place_limit_order(symbol=position.symbol, side=direction.opening_side,
-                                                 quantity=position.quantity, price=position.entry_price,
-                                                 client_order_id=execution.client_id)
+                reply = self._retrying(lambda: client.place_limit_order(
+                    symbol=position.symbol, side=direction.opening_side, quantity=position.quantity,
+                    price=position.entry_price, client_order_id=execution.client_id))
             else:
-                reply = client.place_market_order(symbol=position.symbol, side=direction.opening_side,
-                                                  quantity=position.quantity, client_order_id=execution.client_id)
+                reply = self._retrying(lambda: client.place_market_order(
+                    symbol=position.symbol, side=direction.opening_side, quantity=position.quantity,
+                    client_order_id=execution.client_id))
         except BinanceUnknownOutcomeError as error:
             return self._transition_or_current(
                 position_id, PositionState.ERROR,
@@ -152,11 +159,11 @@ class PositionManager:
             self._positions.update_execution(position_id, role, status="SUBMITTED", submitted_at=self._clock(),
                                              last_error=None)
             try:
-                reply = client.place_conditional_close(
+                reply = self._retrying(lambda: client.place_conditional_close(
                     symbol=position.symbol, side=direction.closing_side, order_type=order_type,
                     trigger_price=trigger_price, client_algo_id=execution.client_id,
                     working_type=self._trigger_price_type,
-                )
+                ))
             except BinanceUnknownOutcomeError as error:
                 failures.append(f"The {label} outcome is unknown: {error}")
                 continue
@@ -236,6 +243,27 @@ class PositionManager:
 
     # --- shared steps -------------------------------------------------------------------------
 
+    def _retrying(self, call: Callable[[], Any]) -> Any:
+        """Run ``call``, resending it after a failure that provably executed nothing.
+
+        Only two failures qualify: the connection was never made (``BinanceUnavailableError``),
+        or Binance refused the request unprocessed because its timestamp fell outside
+        recvWindow (``-1021``, intermittent on slow links). Up to ``TRANSIENT_ATTEMPTS``
+        attempts, waiting 1 s, then 2 s. Anything else, an unknown outcome above all, is
+        raised at once: resending then could execute an order twice.
+        """
+        for attempt in range(1, TRANSIENT_ATTEMPTS + 1):
+            try:
+                return call()
+            except (BinanceUnavailableError, BinanceAPIError) as error:
+                transient = isinstance(error, BinanceUnavailableError) or error.code == OUTSIDE_RECV_WINDOW
+                if not transient or attempt == TRANSIENT_ATTEMPTS:
+                    raise
+                logger.warning("Binance call failed without executing (%s); attempt %s of %s in %s s",
+                               error, attempt + 1, TRANSIENT_ATTEMPTS, attempt)
+                self._sleep(attempt)
+        raise AssertionError("unreachable")
+
     def _record_entry(self, position_id: str, client, reply: dict[str, Any], *, protect: bool) -> Position:
         """Record what Binance said about the entry; a fill (even partial) makes the position OPEN."""
         position = self._positions.get(position_id)
@@ -287,9 +315,10 @@ class PositionManager:
     def _market_close(self, position: Position, client) -> Position:
         direction = PositionDirection(position.direction)
         try:
-            held_amount = net_position(client, position.symbol)
+            held_amount = self._retrying(lambda: net_position(client, position.symbol))
         except BinanceError as error:
-            return self._positions.update_fields(position.position_id, last_error=f"The close could not start: {error}")
+            return self._positions.update_fields(position.position_id, report_event="CLOSE_FAILED",
+                                                 last_error=f"The close could not start: {error}")
         if held_amount == 0:
             return self._transition_or_current(
                 position.position_id, PositionState.ERROR,
@@ -303,9 +332,9 @@ class PositionManager:
         self._positions.update_execution(position.position_id, ExecutionRole.EXIT, status="SUBMITTED",
                                          submitted_at=self._clock(), quantity=abs(held_amount), last_error=None)
         try:
-            reply = client.place_market_order(symbol=position.symbol, side=direction.closing_side,
-                                              quantity=abs(held_amount), client_order_id=execution.client_id,
-                                              reduce_only=True)
+            reply = self._retrying(lambda: client.place_market_order(
+                symbol=position.symbol, side=direction.closing_side, quantity=abs(held_amount),
+                client_order_id=execution.client_id, reduce_only=True))
         except BinanceUnknownOutcomeError as error:
             return self._positions.update_fields(position.position_id,
                                                  last_error=f"The close outcome is unknown: {error}")

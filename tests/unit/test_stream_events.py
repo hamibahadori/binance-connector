@@ -20,7 +20,8 @@ from tests.support import store_position
 @pytest.fixture
 def manager(positions, clients) -> PositionManager:
     return PositionManager(positions=positions, clients=clients, trigger_price_type="MARK_PRICE",
-                           limit_entry_timeout_seconds=300)
+                           limit_entry_timeout_seconds=300,
+                           sleep=lambda _seconds: None)
 
 
 @pytest.fixture

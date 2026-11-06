@@ -13,6 +13,7 @@ Some errors add fields; see the README's error table.
 | BinanceAPIError                    | 422  | binance_rejected                  |
 | BinanceUnavailableError            | 502  | binance_unavailable               |
 | BinanceUnknownOutcomeError         | 504  | binance_outcome_unknown           |
+| sqlalchemy OperationalError        | 503  | database_unavailable              |
 | werkzeug HTTPException (404, 405)  | as is| e.g. not_found                    |
 | anything else                      | 500  | internal_error                    |
 
@@ -24,6 +25,7 @@ import logging
 
 from flask import Flask, Response, jsonify
 from pydantic import ValidationError
+from sqlalchemy.exc import OperationalError
 from werkzeug.exceptions import HTTPException, MethodNotAllowed
 
 from binance_connector.api.routes import InvalidRequestBodyError
@@ -49,6 +51,7 @@ def register_error_handlers(app: Flask) -> None:
     app.register_error_handler(BinanceAPIError, _binance_rejected)
     app.register_error_handler(BinanceUnavailableError, _binance_unavailable)
     app.register_error_handler(BinanceUnknownOutcomeError, _binance_outcome_unknown)
+    app.register_error_handler(OperationalError, _database_unavailable)
     app.register_error_handler(HTTPException, _http_exception)
     app.register_error_handler(Exception, _unexpected_error)
 
@@ -111,6 +114,18 @@ def _binance_outcome_unknown(error: BinanceUnknownOutcomeError) -> tuple[Respons
         execution_status="unknown",
         client_order_id=error.client_order_id,
     )
+
+
+def _database_unavailable(error: OperationalError) -> tuple[Response, int]:
+    """The database could not be used (locked past the busy timeout, file unreachable, ...).
+
+    The caller may retry with the same request_id: if the request was not stored, it is
+    processed then; if it was, the duplicate rule returns its stored receipt. Only the
+    driver's message is logged: the SQL statement and its parameters stay out of the logs.
+    """
+    logger.error("Database unavailable: %s", error.orig)
+    return _error_response(503, "database_unavailable",
+                           "The service's database is unavailable. Retry the same request shortly.")
 
 
 def _http_exception(error: HTTPException) -> Response:

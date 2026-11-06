@@ -1,0 +1,18 @@
+# Never send secrets, local state or tooling into the image build.
+.env
+.env.*
+!.env.example
+.venv/
+.git/
+.idea/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+*.db
+*.db-wal
+*.db-shm
+tests/
+docs/
