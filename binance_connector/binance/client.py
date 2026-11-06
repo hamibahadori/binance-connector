@@ -33,6 +33,7 @@ import requests
 
 from binance_connector.binance.signing import sign_query
 from binance_connector.config import Settings
+from binance_connector.security.credentials import ApiCredentials
 from binance_connector.errors import (
     BinanceAPIError,
     BinanceUnavailableError,
@@ -59,10 +60,14 @@ def format_decimal(value: Decimal) -> str:
 
 
 class BinanceFuturesClient:
-    """Signs and sends requests to the Binance USD-M Futures REST API.
+    """Signs and sends requests to the Binance USD-M Futures REST API for **one account**.
+
+    Each account gets its own client (and so its own credentials and HTTP session); see
+    ``AccountClients`` in ``composition``.
 
     Args:
-        settings: credentials, base URL, recvWindow and timeout.
+        settings: base URL, recvWindow and timeout (shared by all accounts).
+        credentials: this account's API key and secret.
         session: optional ``requests.Session``, for connection reuse or tests.
         clock: returns the current time in ms. Injectable so tests get stable signatures.
     """
@@ -70,12 +75,14 @@ class BinanceFuturesClient:
     def __init__(
         self,
         settings: Settings,
+        credentials: ApiCredentials,
         session: requests.Session | None = None,
         clock: Callable[[], int] = current_time_ms,
     ) -> None:
         self._settings = settings
+        self._api_secret = credentials.api_secret
         self._session = session or requests.Session()
-        self._session.headers[API_KEY_HEADER] = settings.api_key
+        self._session.headers[API_KEY_HEADER] = credentials.api_key
         self._clock = clock
 
     def change_leverage(self, *, symbol: str, leverage: int) -> dict[str, Any]:
@@ -193,7 +200,7 @@ class BinanceFuturesClient:
             ("timestamp", str(self._clock())),
         ]
         query_string = urllib.parse.urlencode(signed_parameters)
-        signature = sign_query(query_string, self._settings.api_secret)
+        signature = sign_query(query_string, self._api_secret)
         url = f"{self._settings.base_url}{path}?{query_string}&signature={signature}"
         return self._send(method, path, url)
 

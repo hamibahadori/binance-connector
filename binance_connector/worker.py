@@ -1,33 +1,23 @@
-"""The worker process: listens to Binance and keeps trades in step with it.
+"""The worker process (being rebuilt for many accounts in plan v2 phases 3–4).
 
-Run from the project folder (after ``alembic upgrade head``)::
+``StreamScheduler`` (v1's ``Worker``) schedules work on one user-data stream's thread:
 
-    python -m binance_connector.worker
-
-Everything runs on one thread, inside the user-data stream's loop:
-
-* every stream event goes to the event handler (TP/SL fills, entry/exit fills);
+* every stream event goes to the event handler;
 * a symbol the handler flags (its position changed) is reconciled a few seconds later, once
   related events have settled;
-* every trade is reconciled after each (re)connect, since events may have been missed,
+* everything is reconciled after each (re)connect, since events may have been missed,
   and again every ``reconcile_interval_seconds``.
 
-One thread means event handling and reconciliation never run concurrently inside the
-worker; the only concurrency is with the API process, which the repository handles.
+In plan v2 each account with live positions gets one stream, and so one scheduler. The
+process entry point (``python -m binance_connector.worker``) returns in phase 4, when the
+execution manager, per-account handlers and reconciliation are wired together.
 """
 
 import logging
-import signal
 import threading
 import time
 from collections.abc import Callable
 from typing import Any, Protocol
-
-from binance_connector.binance.user_stream import UserDataStream
-from binance_connector.composition import build_components, load_settings
-from binance_connector.config import Settings
-from binance_connector.services.reconciliation import ReconciliationService
-from binance_connector.services.stream_events import UserDataEventHandler
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +38,8 @@ class Stream(Protocol):
     def run(self, *, on_event, on_connected, on_idle, should_stop) -> None: ...
 
 
-class Worker:
-    """Schedules event handling and reconciliation on the stream's thread."""
+class StreamScheduler:
+    """Schedules event handling and reconciliation on one stream's thread."""
 
     def __init__(
         self,
@@ -101,46 +91,3 @@ class Worker:
             if now >= due_at:
                 del self._symbols_due[symbol]
                 self._reconciler.reconcile_symbol(symbol)
-
-
-def build_worker(settings: Settings) -> Worker:
-    """Wire a Worker from settings.
-
-    Raises:
-        ConfigurationError: the database schema is not current.
-    """
-    components = build_components(settings)
-    return Worker(
-        stream=UserDataStream(client=components.client, stream_url=settings.stream_url),
-        event_handler=UserDataEventHandler(repository=components.repository,
-                                           trade_service=components.trade_service),
-        reconciler=ReconciliationService(
-            repository=components.repository,
-            client=components.client,
-            position_service=components.position_service,
-            trade_service=components.trade_service,
-        ),
-        reconcile_interval_seconds=settings.reconcile_interval_seconds,
-    )
-
-
-def main() -> None:
-    """Entry point: run until Ctrl+C or SIGTERM, then finish the current step and exit."""
-    from binance_connector import LOG_FORMAT
-
-    logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
-    worker = build_worker(load_settings())
-
-    def request_stop(signal_number, _frame) -> None:
-        logger.info("Received signal %s; stopping", signal_number)
-        worker.stop()
-
-    signal.signal(signal.SIGINT, request_stop)
-    signal.signal(signal.SIGTERM, request_stop)
-    logger.info("Worker starting")
-    worker.run()
-    logger.info("Worker stopped")
-
-
-if __name__ == "__main__":
-    main()

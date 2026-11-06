@@ -9,7 +9,7 @@ from binance_connector.binance.client import BinanceFuturesClient
 from binance_connector.binance.user_stream import UserDataStream
 from binance_connector.config import DEMO_BASE_URL
 from binance_connector.errors import BinanceUnavailableError
-from tests.conftest import TEST_API_KEY
+from tests.conftest import TEST_API_KEY, TEST_CREDENTIALS
 from tests.recorded import stream_events
 
 LISTEN_KEY_URL = f"{DEMO_BASE_URL}/fapi/v1/listenKey"
@@ -23,7 +23,7 @@ STREAM_URL = "wss://demo-fstream.binance.com/ws"
 def test_start_user_stream_sends_only_the_api_key_and_returns_the_listen_key(settings):
     responses.post(LISTEN_KEY_URL, json={"listenKey": "abc123"})
 
-    listen_key = BinanceFuturesClient(settings).start_user_stream()
+    listen_key = BinanceFuturesClient(settings, TEST_CREDENTIALS).start_user_stream()
 
     sent_request = responses.calls[0].request
     assert listen_key == "abc123"
@@ -36,7 +36,7 @@ def test_start_user_stream_sends_only_the_api_key_and_returns_the_listen_key(set
 def test_keepalive_and_close_use_put_and_delete(settings):
     responses.put(LISTEN_KEY_URL, json={"listenKey": "abc123"})
     responses.delete(LISTEN_KEY_URL, json={})
-    client = BinanceFuturesClient(settings)
+    client = BinanceFuturesClient(settings, TEST_CREDENTIALS)
 
     client.keepalive_user_stream()
     client.close_user_stream()

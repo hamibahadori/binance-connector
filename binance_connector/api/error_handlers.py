@@ -7,19 +7,17 @@ Some errors add fields; see the README's error table.
 |------------------------------------|------|-----------------------------------|
 | InvalidRequestBodyError            | 400  | invalid_request_body              |
 | pydantic ValidationError           | 400  | validation_error                  |
-| TradeNotFoundError                 | 404  | trade_not_found                   |
-| TradeConflictError                 | 409  | trade_conflict                    |
-| TradeNotClosableError              | 409  | trade_not_closable                |
-| HedgeModeNotSupportedError         | 409  | hedge_mode_not_supported          |
+| RequestNotFoundError               | 404  | request_not_found                 |
+| PositionNotFoundError              | 404  | position_not_found                |
+| AccountNotFoundError               | 404  | account_not_found                 |
 | BinanceAPIError                    | 422  | binance_rejected                  |
 | BinanceUnavailableError            | 502  | binance_unavailable               |
 | BinanceUnknownOutcomeError         | 504  | binance_outcome_unknown           |
 | werkzeug HTTPException (404, 405)  | as is| e.g. not_found                    |
 | anything else                      | 500  | internal_error                    |
 
-Binance failures *during* an open or close do not reach these handlers: the trade service
-records them on the trade, and the endpoint answers with the trade (see ``trade_routes``).
-The Binance rows above cover failures before a trade exists, such as the position check.
+Business outcomes of a request (rejected, duplicate, …) are not errors here: the intake
+endpoint answers with the request's receipt (plan v2 phase 2).
 """
 
 import logging
@@ -33,10 +31,9 @@ from binance_connector.errors import (
     BinanceAPIError,
     BinanceUnavailableError,
     BinanceUnknownOutcomeError,
-    HedgeModeNotSupportedError,
-    TradeConflictError,
-    TradeNotClosableError,
-    TradeNotFoundError,
+    AccountNotFoundError,
+    PositionNotFoundError,
+    RequestNotFoundError,
 )
 
 logger = logging.getLogger(__name__)
@@ -46,10 +43,9 @@ def register_error_handlers(app: Flask) -> None:
     """Attach every handler in this module to ``app``."""
     app.register_error_handler(InvalidRequestBodyError, _invalid_request_body)
     app.register_error_handler(ValidationError, _validation_error)
-    app.register_error_handler(TradeNotFoundError, _trade_not_found)
-    app.register_error_handler(TradeConflictError, _trade_conflict)
-    app.register_error_handler(TradeNotClosableError, _trade_not_closable)
-    app.register_error_handler(HedgeModeNotSupportedError, _hedge_mode_not_supported)
+    app.register_error_handler(RequestNotFoundError, _not_found("request_not_found", "request_id"))
+    app.register_error_handler(PositionNotFoundError, _not_found("position_not_found", "position_id"))
+    app.register_error_handler(AccountNotFoundError, _not_found("account_not_found", "account_id"))
     app.register_error_handler(BinanceAPIError, _binance_rejected)
     app.register_error_handler(BinanceUnavailableError, _binance_unavailable)
     app.register_error_handler(BinanceUnknownOutcomeError, _binance_outcome_unknown)
@@ -82,20 +78,13 @@ def _validation_error(error: ValidationError) -> tuple[Response, int]:
     return _error_response(400, "validation_error", "The request body is invalid.", details=details)
 
 
-def _trade_not_found(error: TradeNotFoundError) -> tuple[Response, int]:
-    return _error_response(404, "trade_not_found", str(error), trade_id=error.trade_id)
+def _not_found(error_code: str, id_field: str):
+    """A 404 handler that echoes the missing id under ``id_field``."""
 
+    def handler(error: Exception) -> tuple[Response, int]:
+        return _error_response(404, error_code, str(error), **{id_field: getattr(error, id_field)})
 
-def _trade_conflict(error: TradeConflictError) -> tuple[Response, int]:
-    return _error_response(409, "trade_conflict", str(error))
-
-
-def _trade_not_closable(error: TradeNotClosableError) -> tuple[Response, int]:
-    return _error_response(409, "trade_not_closable", str(error), trade_id=error.trade_id, state=str(error.state))
-
-
-def _hedge_mode_not_supported(error: HedgeModeNotSupportedError) -> tuple[Response, int]:
-    return _error_response(409, "hedge_mode_not_supported", str(error), symbol=error.symbol)
+    return handler
 
 
 def _binance_rejected(error: BinanceAPIError) -> tuple[Response, int]:

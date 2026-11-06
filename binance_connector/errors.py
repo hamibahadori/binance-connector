@@ -71,36 +71,62 @@ class HedgeModeNotSupportedError(BinanceConnectorError):
 
 
 class InvalidTransitionError(BinanceConnectorError):
-    """A trade was asked to move to a state its current state does not allow.
+    """A request or position was asked to move to a state its current state does not allow.
 
-    Usually means another process (API or worker) changed the trade first.
+    Usually means another thread or process changed it first.
     """
 
     def __init__(self, current_state: object, target_state: object) -> None:
-        super().__init__(f"A trade cannot move from {current_state} to {target_state}.")
+        super().__init__(f"Cannot move from {current_state} to {target_state}.")
         self.current_state = current_state
         self.target_state = target_state
 
 
-class TradeNotFoundError(BinanceConnectorError):
-    """No trade exists with the given id."""
-
-    def __init__(self, trade_id: str) -> None:
-        super().__init__(f"There is no trade with id {trade_id}.")
-        self.trade_id = trade_id
+class CredentialDecryptionError(BinanceConnectorError):
+    """Stored credentials could not be decrypted (wrong CREDENTIALS_ENCRYPTION_KEY, or tampered data)."""
 
 
-class TradeConflictError(BinanceConnectorError):
-    """A new trade clashes with an existing one (same symbol active, or same request id)."""
+class AccountNotFoundError(BinanceConnectorError):
+    def __init__(self, account_id: str) -> None:
+        super().__init__(f"There is no account {account_id}.")
+        self.account_id = account_id
 
 
-class TradeNotClosableError(BinanceConnectorError):
-    """A close was requested for a trade whose state does not allow closing."""
+class AccountOwnershipError(BinanceConnectorError):
+    """A request named an account that belongs to a different user."""
 
-    def __init__(self, trade_id: str, state: object) -> None:
-        super().__init__(f"Trade {trade_id} is {state} and cannot be closed now.")
-        self.trade_id = trade_id
-        self.state = state
+    def __init__(self, account_id: str) -> None:
+        super().__init__(f"Account {account_id} belongs to a different user.")
+        self.account_id = account_id
+
+
+class RequestNotFoundError(BinanceConnectorError):
+    def __init__(self, request_id: str) -> None:
+        super().__init__(f"There is no request {request_id}.")
+        self.request_id = request_id
+
+
+class DuplicateRequestError(BinanceConnectorError):
+    """A request_id was used before. ``existing`` is the stored request."""
+
+    def __init__(self, existing: object) -> None:
+        super().__init__(f"Request {getattr(existing, 'request_id', '?')} was already received.")
+        self.existing = existing
+
+
+class PositionNotFoundError(BinanceConnectorError):
+    def __init__(self, position_id: str) -> None:
+        super().__init__(f"There is no position {position_id}.")
+        self.position_id = position_id
+
+
+class PositionConflictError(BinanceConnectorError):
+    """The account already has an active position on the symbol (one per symbol per account)."""
+
+    def __init__(self, account_id: str, symbol: str) -> None:
+        super().__init__(f"Account {account_id} already has an active position on {symbol}.")
+        self.account_id = account_id
+        self.symbol = symbol
 
 
 class CloseQuantityExceedsPositionError(BinanceConnectorError):

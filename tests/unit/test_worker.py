@@ -1,6 +1,6 @@
-"""Unit tests for the worker's scheduling: what it reconciles, and when."""
+"""Unit tests for one stream's scheduling: what it reconciles, and when."""
 
-from binance_connector.worker import Worker
+from binance_connector.worker import StreamScheduler
 
 
 class FakeClock:
@@ -38,7 +38,7 @@ class ManualStream:
 
 def make_worker(clock, reconciler):
     stream = ManualStream()
-    worker = Worker(stream=stream, event_handler=SymbolsFromEvents(), reconciler=reconciler,
+    worker = StreamScheduler(stream=stream, event_handler=SymbolsFromEvents(), reconciler=reconciler,
                     reconcile_interval_seconds=60, settle_delay_seconds=5, clock=clock)
     worker.run()
     return worker, stream

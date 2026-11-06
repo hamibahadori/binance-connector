@@ -1,12 +1,12 @@
-"""binance-connector: execute Strategy trades on Binance USD-M futures.
+"""binance-connector: a multi-account Strategy execution service on Binance USD-M futures.
 
 Two processes share one database:
 
-* the API (this Flask app)::
+* the API (this Flask app): intake of Django's requests and their latest state::
 
       flask --app binance_connector run --port 5001
 
-* the worker, which listens to Binance and reconciles::
+* the worker: execution, Binance streams, reconciliation, reports, live WebSocket::
 
       python -m binance_connector.worker
 
@@ -20,11 +20,20 @@ from flask import Flask
 
 from binance_connector.api.error_handlers import register_error_handlers
 from binance_connector.api.routes import health_blueprint
-from binance_connector.api.trade_routes import TRADE_SERVICE_KEY, trades_blueprint
 from binance_connector.composition import build_components, load_settings
 from binance_connector.config import Settings
+from binance_connector.security.redaction import install_log_redaction
 
 LOG_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
+
+COMPONENTS_KEY = "components"
+"""Key under ``app.extensions`` where ``create_app`` stores the shared components."""
+
+
+def configure_logging() -> None:
+    """INFO-level logs with every registered secret masked (spec §10)."""
+    logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
+    install_log_redaction()
 
 
 def create_app(settings: Settings | None = None) -> Flask:
@@ -38,14 +47,12 @@ def create_app(settings: Settings | None = None) -> Flask:
             current. The service refuses to start rather than fail on the first request.
     """
     settings = settings or load_settings()
-
-    logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
+    configure_logging()
 
     app = Flask(__name__, static_folder=None)  # a JSON API serves no static files
     app.json.sort_keys = False  # keep response fields in the documented order
 
-    app.extensions[TRADE_SERVICE_KEY] = build_components(settings).trade_service
+    app.extensions[COMPONENTS_KEY] = build_components(settings)
     app.register_blueprint(health_blueprint)
-    app.register_blueprint(trades_blueprint)
     register_error_handlers(app)
     return app

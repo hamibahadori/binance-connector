@@ -20,7 +20,7 @@ from binance_connector.errors import (
     BinanceUnavailableError,
     BinanceUnknownOutcomeError,
 )
-from tests.conftest import TEST_API_KEY, TEST_API_SECRET
+from tests.conftest import TEST_API_KEY, TEST_API_SECRET, TEST_CREDENTIALS
 
 FIXED_TIMESTAMP_MS = 1_700_000_000_000
 ORDER_URL = f"{DEMO_BASE_URL}/fapi/v1/order"
@@ -43,7 +43,7 @@ ORDER_RESPONSE = {
 @pytest.fixture
 def client(settings) -> BinanceFuturesClient:
     """A client whose clock always returns the same timestamp."""
-    return BinanceFuturesClient(settings, clock=lambda: FIXED_TIMESTAMP_MS)
+    return BinanceFuturesClient(settings, TEST_CREDENTIALS, clock=lambda: FIXED_TIMESTAMP_MS)
 
 
 def split_signed_query(request_url: str) -> tuple[str, str]:

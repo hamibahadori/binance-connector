@@ -1,13 +1,20 @@
 """Fixtures shared by the unit and functional test layers."""
 
 import pytest
+from cryptography.fernet import Fernet
 
 from binance_connector.config import DEMO_BASE_URL, Settings
 from binance_connector.persistence.database import create_database_engine, create_session_factory
 from binance_connector.persistence.schema import upgrade_to_head
+from binance_connector.security.credentials import ApiCredentials, CredentialCipher
 
 TEST_API_KEY = "test-api-key"
 TEST_API_SECRET = "test-api-secret"
+TEST_CREDENTIALS = ApiCredentials(api_key=TEST_API_KEY, api_secret=TEST_API_SECRET)
+"""Fake Binance credentials. Unit and functional tests intercept every HTTP call, so these
+never reach Binance."""
+
+TEST_ENCRYPTION_KEY = Fernet.generate_key().decode()
 
 
 @pytest.fixture
@@ -34,15 +41,15 @@ def session_factory(database_engine):
 
 
 @pytest.fixture
-def settings(database_url) -> Settings:
-    """Settings with fake credentials, the Demo base URL, and a fresh migrated database.
+def cipher() -> CredentialCipher:
+    return CredentialCipher(TEST_ENCRYPTION_KEY)
 
-    Unit and functional tests intercept every HTTP call with ``responses``,
-    so these credentials never reach Binance.
-    """
+
+@pytest.fixture
+def settings(database_url) -> Settings:
+    """Service settings pointing at Demo, with a fresh migrated database."""
     return Settings(
-        api_key=TEST_API_KEY,
-        api_secret=TEST_API_SECRET,
+        credentials_encryption_key=TEST_ENCRYPTION_KEY,
         base_url=DEMO_BASE_URL,
         recv_window_ms=5000,
         timeout_seconds=10.0,

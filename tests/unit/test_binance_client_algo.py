@@ -13,7 +13,7 @@ from binance_connector.binance.client import BinanceFuturesClient
 from binance_connector.binance.signing import sign_query
 from binance_connector.config import DEMO_BASE_URL
 from binance_connector.errors import BinanceAPIError
-from tests.conftest import TEST_API_SECRET
+from tests.conftest import TEST_API_SECRET, TEST_CREDENTIALS
 from tests.recorded import rest_reply
 
 FIXED_TIMESTAMP_MS = 1_700_000_000_000
@@ -23,7 +23,7 @@ OPEN_ALGO_ORDERS_URL = f"{DEMO_BASE_URL}/fapi/v1/openAlgoOrders"
 
 @pytest.fixture
 def client(settings) -> BinanceFuturesClient:
-    return BinanceFuturesClient(settings, clock=lambda: FIXED_TIMESTAMP_MS)
+    return BinanceFuturesClient(settings, TEST_CREDENTIALS, clock=lambda: FIXED_TIMESTAMP_MS)
 
 
 def signed_parts(request_url: str) -> tuple[str, str]:

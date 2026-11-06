@@ -4,13 +4,14 @@ import pytest
 
 from binance_connector import create_app
 from binance_connector.errors import ConfigurationError
+from tests.conftest import TEST_ENCRYPTION_KEY
 
 SERVICE_VARIABLES = (
-    "BINANCE_API_KEY",
-    "BINANCE_API_SECRET",
+    "CREDENTIALS_ENCRYPTION_KEY",
     "BINANCE_BASE_URL",
     "DATABASE_URL",
     "BINANCE_TRIGGER_PRICE_TYPE",
+    "INBOUND_API_TOKEN",
 )
 
 
@@ -25,40 +26,37 @@ def clean_environment(monkeypatch, tmp_path, database_url):
 
 
 def test_app_builds_from_environment_variables(clean_environment):
-    clean_environment.setenv("BINANCE_API_KEY", "env-key")
-    clean_environment.setenv("BINANCE_API_SECRET", "env-secret")
+    clean_environment.setenv("CREDENTIALS_ENCRYPTION_KEY", TEST_ENCRYPTION_KEY)
 
     response = create_app().test_client().get("/health")
 
     assert response.status_code == 200
+    assert response.get_json() == {"status": "ok"}
 
 
 def test_app_reads_dotenv_file_in_working_directory(clean_environment, tmp_path):
-    (tmp_path / ".env").write_bytes(b"BINANCE_API_KEY=file-key\nBINANCE_API_SECRET=file-secret\n")
+    (tmp_path / ".env").write_bytes(f"CREDENTIALS_ENCRYPTION_KEY={TEST_ENCRYPTION_KEY}\n".encode())
 
-    response = create_app().test_client().get("/health")
-
-    assert response.status_code == 200
+    assert create_app().test_client().get("/health").status_code == 200
 
 
-def test_app_refuses_to_start_without_credentials(clean_environment):
-    with pytest.raises(ConfigurationError, match="BINANCE_API_KEY"):
+def test_app_refuses_to_start_without_an_encryption_key(clean_environment):
+    with pytest.raises(ConfigurationError, match="CREDENTIALS_ENCRYPTION_KEY"):
         create_app()
 
 
 def test_app_refuses_to_start_on_an_unmigrated_database(clean_environment, tmp_path):
-    clean_environment.setenv("BINANCE_API_KEY", "env-key")
-    clean_environment.setenv("BINANCE_API_SECRET", "env-secret")
+    clean_environment.setenv("CREDENTIALS_ENCRYPTION_KEY", TEST_ENCRYPTION_KEY)
     clean_environment.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'never-migrated.db'}")
 
     with pytest.raises(ConfigurationError, match="alembic upgrade head"):
         create_app()
 
 
-def test_an_invalid_trigger_price_type_is_refused(clean_environment):
-    clean_environment.setenv("BINANCE_API_KEY", "env-key")
-    clean_environment.setenv("BINANCE_API_SECRET", "env-secret")
-    clean_environment.setenv("BINANCE_TRIGGER_PRICE_TYPE", "LAST_PRICE")
+def test_unknown_routes_return_json_404(clean_environment):
+    clean_environment.setenv("CREDENTIALS_ENCRYPTION_KEY", TEST_ENCRYPTION_KEY)
 
-    with pytest.raises(ConfigurationError, match="BINANCE_TRIGGER_PRICE_TYPE"):
-        create_app()
+    response = create_app().test_client().get("/api/v1/strategy/trades")
+
+    assert response.status_code == 404
+    assert response.get_json()["error"] == "not_found"
