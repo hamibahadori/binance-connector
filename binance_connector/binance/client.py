@@ -205,29 +205,39 @@ class BinanceFuturesClient:
         return self._send(method, path, url)
 
     def _send(self, method: str, path: str, url: str) -> Any:
-        """Send one request and turn failures into typed errors (the API key header is always set)."""
-        try:
-            response = self._session.request(method, url, timeout=self._settings.timeout_seconds)
-        except requests.exceptions.ConnectTimeout as error:
-            # The connection was never established, so Binance never saw the request.
-            raise BinanceUnavailableError(f"Could not connect to Binance for {method} {path}.") from error
-        except requests.exceptions.RequestException as error:
-            # Anything else (read timeout, reset, DNS and so on) may have happened after
-            # Binance received the request. Treat the outcome as unknown, never as a failure.
-            raise BinanceUnknownOutcomeError(
-                f"No reliable reply from Binance for {method} {path}: {error.__class__.__name__}."
-            ) from error
+        """Send one request (the API key header is always set) and map failures to typed errors."""
+        return send_request(self._session, method, path, url, self._settings.timeout_seconds)
 
-        logger.info("Binance %s %s -> HTTP %s", method, path, response.status_code)
 
-        if response.status_code >= 500:
-            raise BinanceUnknownOutcomeError(
-                f"Binance returned HTTP {response.status_code} for {method} {path}; "
-                "the execution status is unknown."
-            )
-        if response.status_code >= 400:
-            raise _api_error_from(response)
-        return response.json()
+def send_request(session: requests.Session, method: str, path: str, url: str, timeout_seconds: float) -> Any:
+    """Send one Binance REST request and turn every failure into a typed error.
+
+    Shared by the account client and the public (keyless) client, so both classify
+    failures the same way: a connect timeout means nothing reached Binance; any other
+    network failure or 5xx means the outcome is unknown; a 4xx is Binance's rejection.
+    """
+    try:
+        response = session.request(method, url, timeout=timeout_seconds)
+    except requests.exceptions.ConnectTimeout as error:
+        # The connection was never established, so Binance never saw the request.
+        raise BinanceUnavailableError(f"Could not connect to Binance for {method} {path}.") from error
+    except requests.exceptions.RequestException as error:
+        # Anything else (read timeout, reset, DNS and so on) may have happened after
+        # Binance received the request. Treat the outcome as unknown, never as a failure.
+        raise BinanceUnknownOutcomeError(
+            f"No reliable reply from Binance for {method} {path}: {error.__class__.__name__}."
+        ) from error
+
+    logger.info("Binance %s %s -> HTTP %s", method, path, response.status_code)
+
+    if response.status_code >= 500:
+        raise BinanceUnknownOutcomeError(
+            f"Binance returned HTTP {response.status_code} for {method} {path}; "
+            "the execution status is unknown."
+        )
+    if response.status_code >= 400:
+        raise _api_error_from(response)
+    return response.json()
 
 
 def _api_error_from(response: requests.Response) -> BinanceAPIError:

@@ -82,6 +82,18 @@ class InvalidTransitionError(BinanceConnectorError):
         self.target_state = target_state
 
 
+class UnknownSymbolError(BinanceConnectorError):
+    """Binance does not list the symbol as trading."""
+
+    def __init__(self, symbol: str) -> None:
+        super().__init__(f"{symbol} is not a trading symbol on Binance USD-M futures.")
+        self.symbol = symbol
+
+
+class MarketDataUnavailableError(BinanceConnectorError):
+    """Exchange rules or the current price could not be read; a request cannot be validated now."""
+
+
 class CredentialDecryptionError(BinanceConnectorError):
     """Stored credentials could not be decrypted (wrong CREDENTIALS_ENCRYPTION_KEY, or tampered data)."""
 
