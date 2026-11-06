@@ -21,8 +21,8 @@ DEMO_STREAM_URL = "wss://demo-fstream.binance.com/ws"
 """Demo user-data stream base; the listenKey is appended. Verified on Demo 2026-11-05.
 Production documents ``wss://fstream.binance.com/private/ws``."""
 
-DEMO_MARKET_STREAM_URL = "wss://demo-fstream.binance.com/ws"
-"""Demo market-data stream base (mark prices). Verified on Demo 2026-11-07."""
+DEMO_MARKET_STREAM_URL = "wss://demo-fstream.binance.com/stream"
+"""Demo combined market stream (``?streams=...`` is appended). Verified on Demo 2026-11-07."""
 
 DEFAULT_RECV_WINDOW_MS = 5000
 MAX_RECV_WINDOW_MS = 60000

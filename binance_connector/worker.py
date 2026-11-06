@@ -14,6 +14,8 @@ Threads:
 * **one stream thread per account** (``StreamScheduler``): that account's events go to its
   event handler; a symbol whose position changed is reconciled a few seconds later; the
   whole account is reconciled after every (re)connect and every ``RECONCILE_INTERVAL_SECONDS``.
+* **price feed** (``PriceFeed``): one market stream with the mark price of every symbol that
+  has an active position, stored for the API and passed to listeners.
 
 Ctrl+C or SIGTERM stops the loop, then every stream, then the pool (running requests finish).
 """
@@ -33,6 +35,7 @@ from binance_connector.persistence.positions import PositionRepository
 from binance_connector.services.account_clients import AccountClients
 from binance_connector.services.execution_manager import ExecutionManager
 from binance_connector.services.position_manager import PositionManager
+from binance_connector.services.price_feed import PriceFeed
 from binance_connector.services.reconciliation import ReconciliationService
 from binance_connector.services.stream_events import UserDataEventHandler
 
@@ -169,6 +172,8 @@ class WorkerProcess:
         tick_seconds: float = TICK_SECONDS,
         stream_sync_seconds: float = STREAM_SYNC_SECONDS,
         limit_expiry_seconds: float = LIMIT_EXPIRY_CHECK_SECONDS,
+        background_tasks: list[Callable[[Callable[[], bool]], None]] | None = None,
+        price_feed: PriceFeed | None = None,
         on_shutdown: Callable[[], None] | None = None,
     ) -> None:
         self._positions = positions
@@ -181,20 +186,32 @@ class WorkerProcess:
         self._stream_sync_seconds = stream_sync_seconds
         self._limit_expiry_seconds = limit_expiry_seconds
         self._on_shutdown = on_shutdown
+        self._background_tasks = list(background_tasks or [])
+        self._background_threads: list[threading.Thread] = []
+        self.price_feed = price_feed
+        """The live price feed, for components that need prices (the WebSocket manager)."""
         self._streams: dict[str, Any] = {}
         self._stop_requested = threading.Event()
         self._next_stream_sync_at: float | None = None
         self._next_limit_expiry_at: float | None = None
 
     def run(self) -> None:
-        """Block until ``stop()``; then stop every stream."""
+        """Block until ``stop()``; then stop every stream and background task."""
         self._execution_manager.recover()
+        for task in self._background_tasks:
+            thread = threading.Thread(target=task, args=(self._stop_requested.is_set,), daemon=True,
+                                      name=getattr(task, "__name__", "background"))
+            thread.start()
+            self._background_threads.append(thread)
         try:
             while not self._stop_requested.is_set():
                 self.tick()
                 self._sleep(self._tick_seconds)
         finally:
+            self._stop_requested.set()
             self._stop_streams()
+            for thread in self._background_threads:
+                thread.join(timeout=STREAM_STOP_TIMEOUT_SECONDS)
 
     def stop(self) -> None:
         self._stop_requested.set()
@@ -277,9 +294,14 @@ def build_worker(settings: Settings) -> WorkerProcess:
         executor.shutdown(wait=True)
         components.engine.dispose()
 
+    price_feed = PriceFeed(
+        market_data=components.market_data,
+        symbols=lambda: {position.symbol for position in components.positions.list_active()},
+        stream_url=settings.market_stream_url,
+    )
     return WorkerProcess(positions=components.positions, execution_manager=execution_manager,
                          position_manager=position_manager, stream_factory=stream_factory,
-                         on_shutdown=release_resources)
+                         background_tasks=[price_feed.run], price_feed=price_feed, on_shutdown=release_resources)
 
 
 def main() -> None:

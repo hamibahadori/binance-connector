@@ -1,5 +1,8 @@
 """Unit tests for the worker process loop: queue, per-account streams, limit expiry, shutdown."""
 
+import threading
+import time
+
 import pytest
 
 from binance_connector.domain.lifecycle import PositionState
@@ -142,6 +145,30 @@ def test_limit_entries_are_checked_for_expiry_on_their_interval(worker, position
     worker.tick()
 
     assert position_manager.expiry_runs == 2
+
+
+def test_background_tasks_run_on_their_own_threads_until_the_worker_stops(positions, execution, position_manager,
+                                                                         stream_log, clock):
+    started = threading.Event()
+    finished = threading.Event()
+
+    def price_feed_like_task(should_stop):
+        started.set()
+        while not should_stop():
+            time.sleep(0.01)
+        finished.set()
+
+    def sleep_until_task_started(seconds):
+        assert started.wait(5)
+        worker.stop()
+
+    worker = WorkerProcess(positions=positions, execution_manager=execution, position_manager=position_manager,
+                           stream_factory=lambda account_id: FakeAccountStream(account_id, stream_log), clock=clock,
+                           sleep=sleep_until_task_started, background_tasks=[price_feed_like_task])
+
+    worker.run()
+
+    assert finished.wait(5)
 
 
 def test_run_recovers_first_and_stops_every_stream_on_shutdown(positions, execution, position_manager, stream_log,

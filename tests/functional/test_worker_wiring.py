@@ -12,6 +12,7 @@ def test_the_worker_is_wired_from_settings(settings):
     worker = build_worker(settings)
 
     assert isinstance(worker, WorkerProcess)
+    assert worker.price_feed is not None
     worker.shutdown()
 
 
