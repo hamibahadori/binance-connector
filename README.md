@@ -1,5 +1,9 @@
 # binance-connector: Strategy execution service
 
+> **Note:** This was a project for a customer. I dropped it because of inconsistencies in the
+> requirements. Although the job is incomplete, I decided to publish my work so far anyway.
+> The customer's specification is in [docs/customer-spec.md](docs/customer-spec.md).
+
 An independent Python service that receives trade requests from **Django**, executes them
 on **Binance USDⓈ-M futures Demo** (each user on their own Demo account), manages every
 position's state, and reports every step back to Django: by HTTP push, and live over a
@@ -39,6 +43,7 @@ Binance Demo ◄─────────────────────�
 
 | Document | Contents |
 |---|---|
+| [docs/customer-spec.md](docs/customer-spec.md) | The customer's specification this service was built against (§1–§14) |
 | [docs/api-contract.md](docs/api-contract.md) | **The Django ↔ Python contract**: request fields and rules, answers, the position view, reports to Django, the WebSocket |
 | [docs/samples/](docs/samples/) | Real requests, replies, reports and WebSocket messages, recorded on Binance Demo |
 | [docs/database.md](docs/database.md) | Every table and column, the states, how recovery works |
