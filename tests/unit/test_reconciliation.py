@@ -14,6 +14,7 @@ from binance_connector.errors import BinanceAPIError, BinanceUnavailableError
 from binance_connector.persistence.writes import utc_now
 from binance_connector.services.position_manager import PositionManager
 from binance_connector.services.reconciliation import ReconciliationService
+from tests.fakes import UNKNOWN_ORDER
 from tests.support import POSITION_ID, store_position
 
 GRACE_SECONDS = 120
@@ -185,6 +186,39 @@ def test_a_take_profit_fill_missed_by_the_stream_is_found(reconciler, positions,
     assert position.realized_pnl == Decimal("8.0210")  # (82010.5 - 78000) x 0.002
     assert position.executions[ExecutionRole.TAKE_PROFIT].status == "FINISHED"
     assert position.executions[ExecutionRole.STOP_LOSS].status == "EXPIRED"
+
+
+def binance_lags_behind_its_own_algo_orders(binance) -> None:
+    """Both TP/SL lookups answer "Order does not exist" although the orders were just placed."""
+    for _leg in range(2):
+        binance.fail_next("get_algo_order", BinanceAPIError(*UNKNOWN_ORDER))
+
+
+def test_legs_placed_moments_ago_that_rest_does_not_know_yet_are_not_an_error(reconciler, positions, binance,
+                                                                             manager):
+    """Found in a manual run on Demo (2026-11-07): the account's stream connected and
+    reconciled 0.9 s after the take-profit was placed; Binance's REST answered -2013 for it,
+    and the open, protected position went to ERROR."""
+    open_and_protected(positions, binance, manager)
+    binance_lags_behind_its_own_algo_orders(binance)
+
+    reconciler.reconcile_account("account-1")
+
+    position = positions.get(POSITION_ID)
+    assert position.state is PositionState.OPEN
+    assert position.last_error is None
+
+
+def test_legs_still_unknown_after_the_grace_period_are_an_error(reconciler, positions, binance, manager, clock):
+    open_and_protected(positions, binance, manager)
+    binance_lags_behind_its_own_algo_orders(binance)
+    clock.offset_seconds = GRACE_SECONDS + 1
+
+    reconciler.reconcile_account("account-1")
+
+    position = positions.get(POSITION_ID)
+    assert position.state is PositionState.ERROR
+    assert "no longer known to Binance" in position.last_error
 
 
 def test_a_position_gone_without_our_orders_is_closed_as_external(reconciler, positions, binance, manager):

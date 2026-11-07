@@ -181,6 +181,10 @@ class ReconciliationService:
                     missing.append(role)
                 else:
                     waiting = True
+            elif not self._past_grace(execution.submitted_at, position):
+                # Placed moments ago: Binance's REST can lag behind its own reply (on Demo it
+                # answered -2013 for a take-profit placed 0.9 s earlier). Look again next pass.
+                waiting = True
             else:
                 problems.append(f"The {label} is no longer known to Binance while the position is open.")
         return problems, missing, waiting
