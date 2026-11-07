@@ -28,14 +28,14 @@ def test_an_open_position_shows_the_current_price_and_unrealized_pnl_net_of_fees
 
     assert view["prices"]["current"] == "79000"
     assert view["prices"]["current_at"] == "2026-11-07T12:00:00+00:00"
-    assert view["pnl"] == {"kind": "UNREALIZED", "gross": "2.000", "fees": "0.0624", "net": "1.9376"}
+    assert view["pnl"] == {"kind": "UNREALIZED", "gross": "2", "fees": "0.0624", "net": "1.9376"}
 
 
 def test_distances_to_take_profit_and_stop_loss_follow_the_current_price(positions):
     view = position_view(open_position(positions), user_id="user-1", market_price=market("80000"))
 
-    assert view["take_profit"]["distance"] == {"absolute": "2000.0", "percent": "2.5000"}
-    assert view["stop_loss"]["distance"] == {"absolute": "6000.0", "percent": "7.5000"}
+    assert view["take_profit"]["distance"] == {"absolute": "2000", "percent": "2.5"}
+    assert view["stop_loss"]["distance"] == {"absolute": "6000", "percent": "7.5"}
 
 
 def test_without_a_price_there_is_no_unrealized_pnl_or_distance(positions):
@@ -53,5 +53,5 @@ def test_a_closed_position_shows_its_realized_pnl_not_the_current_price_move(pos
 
     view = position_view(closed, user_id="user-1", market_price=market("70000"))
 
-    assert view["pnl"] == {"kind": "REALIZED", "gross": "8.000", "fees": "0.128", "net": "7.872"}
+    assert view["pnl"] == {"kind": "REALIZED", "gross": "8", "fees": "0.128", "net": "7.872"}
     assert view["close_reason"] == "TAKE_PROFIT"

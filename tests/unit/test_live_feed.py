@@ -90,7 +90,7 @@ def test_the_snapshot_lists_the_active_positions_with_the_latest_price(hub, posi
     assert position["position_id"] == POSITION_ID
     assert position["user_id"] == "user-of-account-1"
     assert position["prices"]["current"] == "79000"
-    assert position["pnl"]["gross"] == "2.000"
+    assert position["pnl"]["gross"] == "2"
 
 
 def test_the_snapshot_can_be_limited_to_one_account(hub, positions):
@@ -141,9 +141,9 @@ def test_a_price_tick_sends_each_position_on_that_symbol_its_pnl_and_distances(h
         POSITION_ID, "account-1", "user-of-account-1", "BTCUSDT")
     assert data["state"] == "OPEN"
     assert data["prices"]["current"] == "80000"
-    assert data["pnl"] == {"kind": "UNREALIZED", "gross": "4.000", "fees": "0.0624", "net": "3.9376"}
-    assert data["take_profit"]["distance"]["absolute"] == "2000.0"
-    assert data["stop_loss"]["distance"]["absolute"] == "6000.0"
+    assert data["pnl"] == {"kind": "UNREALIZED", "gross": "4", "fees": "0.0624", "net": "3.9376"}
+    assert data["take_profit"]["distance"]["absolute"] == "2000"
+    assert data["stop_loss"]["distance"]["absolute"] == "6000"
     assert data["updated_at"] == TICK_TIME.isoformat()
 
 

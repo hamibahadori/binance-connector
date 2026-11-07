@@ -1,0 +1,20 @@
+{
+  "type": "service_status",
+  "sent_at": "2026-11-06T23:59:48.870301+00:00",
+  "data": {
+    "price_feed": {
+      "connected": true,
+      "symbols": [
+        "BTCUSDT"
+      ],
+      "last_tick_at": "2026-11-06T23:59:48+00:00",
+      "last_error": null
+    },
+    "account_streams": {},
+    "reports": {
+      "PENDING": 1,
+      "SENT": 18
+    },
+    "clients": 1
+  }
+}

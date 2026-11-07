@@ -2,7 +2,7 @@
 
 ``position_view`` carries spec §6's fields: request/user/account/position ids, symbol,
 direction, state, times (received, started, ended), entry/current/exit prices, P&L,
-TP/SL status, close reason and error. Decimals are strings (no precision is lost) and
+TP/SL status, close reason and error. Decimals are exact strings without trailing zeros
 times are ISO 8601 UTC. Credentials never appear in any view.
 """
 
@@ -12,6 +12,7 @@ from typing import Any
 
 from binance_connector.domain.lifecycle import ExecutionRole, PositionState
 from binance_connector.domain.pnl import price_distance, unrealized_pnl
+from binance_connector.domain.sizing import plain
 from binance_connector.persistence.market_data import MarketPrice
 from binance_connector.persistence.positions import Position
 from binance_connector.persistence.requests import Request
@@ -148,7 +149,8 @@ def _protection(position: Position, role: ExecutionRole, trigger_price: Decimal 
 
 
 def _decimal(value: Decimal | None) -> str | None:
-    return None if value is None else format(value, "f")
+    """Exact, without trailing zeros or exponent: 75900.1, 0.002, 82000, -0.0014."""
+    return None if value is None else plain(value)
 
 
 def _time(value: datetime | None) -> str | None:

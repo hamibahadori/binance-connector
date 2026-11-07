@@ -1,8 +1,8 @@
 """Shared building blocks for request validation (pydantic).
 
-Validation stops obviously bad input before any Binance call. Rules that depend on the
-market, such as a symbol's step size or minimum notional, are left to Binance, which
-knows them precisely. The request models themselves are in ``trade_schemas``.
+These field types stop malformed input before anything is stored. Rules that depend on
+the market (step size, tick size, minimum notional) are checked afterwards by the intake
+service against Binance's rules. The request models are in ``request_schemas``.
 """
 
 from decimal import Decimal

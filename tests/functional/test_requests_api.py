@@ -101,7 +101,7 @@ def test_a_position_can_be_read_with_the_spec_6_fields(http_client, market):
                        "times", "prices", "pnl", "take_profit", "stop_loss", "close_reason", "error"):
         assert field_name in position_view, field_name
     assert position_view["user_id"] == "user-1"
-    assert position_view["take_profit"]["price"] == "82000.0"
+    assert position_view["take_profit"]["price"] == "82000"  # exact, without trailing zeros
     assert position_view["take_profit"]["status"] is None
 
 

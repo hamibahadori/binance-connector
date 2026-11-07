@@ -1,0 +1,66 @@
+{
+  "account_id": "e2e-account-1",
+  "action": "OPEN",
+  "already_closed": false,
+  "decided_at": "2026-11-06T23:59:33.766697+00:00",
+  "duplicate": true,
+  "position": {
+    "account_id": "e2e-account-1",
+    "close_reason": null,
+    "close_request_id": null,
+    "direction": "LONG",
+    "entry": {
+      "average_price": null,
+      "requested_price": "75846.8",
+      "slippage": null,
+      "type": "MARKET"
+    },
+    "error": null,
+    "leverage": 5,
+    "pnl": {
+      "fees": null,
+      "gross": null,
+      "kind": null,
+      "net": null
+    },
+    "position_id": "5c322d1bb59a49dbba8a9b84",
+    "prices": {
+      "current": null,
+      "current_at": null,
+      "entry": null,
+      "exit": null
+    },
+    "quantity": {
+      "filled": null,
+      "ordered": "0.002",
+      "requested": "0.002",
+      "type": "BASE"
+    },
+    "request_id": "e2e-1794009563-lifecycle-open",
+    "state": "OPENING",
+    "stop_loss": {
+      "distance": null,
+      "price": "73571.4",
+      "status": null
+    },
+    "symbol": "BTCUSDT",
+    "take_profit": {
+      "distance": null,
+      "price": "78122.2",
+      "status": null
+    },
+    "times": {
+      "ended": null,
+      "received": "2026-11-06T23:59:33.761107+00:00",
+      "started": null,
+      "updated": "2026-11-06T23:59:33.761107+00:00"
+    },
+    "user_id": "e2e-user-1"
+  },
+  "position_id": "5c322d1bb59a49dbba8a9b84",
+  "reasons": [],
+  "received_at": "2026-11-06T23:59:33.757725+00:00",
+  "request_id": "e2e-1794009563-lifecycle-open",
+  "status": "ACCEPTED",
+  "user_id": "e2e-user-1"
+}

@@ -81,6 +81,24 @@ def test_either_event_of_the_fill_alone_closes_the_position(handler, positions, 
     assert positions.get("spike-b").close_reason is CloseReason.STOP_LOSS
 
 
+def test_late_algo_statuses_never_move_a_finished_leg_backwards(handler, positions):
+    """Seen on Demo (2026-11-07): the fill arrived before the algo order's TRIGGERING /
+    TRIGGERED updates. The fill finishes the leg; the late updates must not undo that."""
+    protected_position(positions, "spike-b")
+    recorded = events_for("lx-spike-b-sl")
+    fill = [event for event in recorded if event["e"] == "ORDER_TRADE_UPDATE" and event["o"]["X"] == "FILLED"]
+    late_algo_updates = [event for event in recorded
+                         if event["e"] == "ALGO_UPDATE" and event["o"]["X"] in ("NEW", "TRIGGERING", "TRIGGERED")]
+    assert fill and late_algo_updates, "the recording should hold both"
+
+    for event in fill + late_algo_updates:
+        handler.handle(event)
+
+    position = positions.get("spike-b")
+    assert position.close_reason is CloseReason.STOP_LOSS
+    assert position.executions[ExecutionRole.STOP_LOSS].status == "FINISHED"
+
+
 def test_a_late_protection_fill_corrects_a_position_closed_as_external(handler, positions):
     protected_position(positions, "spike-b")
     positions.transition("spike-b", PositionState.CLOSED, close_reason=CloseReason.EXTERNAL, last_error="unexplained")

@@ -1,0 +1,16 @@
+{
+  "request_id": "e2e-1794009563-rejected-too-small",
+  "status": "REJECTED",
+  "action": "OPEN",
+  "user_id": "e2e-user-1",
+  "account_id": "e2e-account-1",
+  "position_id": null,
+  "received_at": "2026-11-06T23:59:43.306936+00:00",
+  "decided_at": "2026-11-06T23:59:43.310222+00:00",
+  "reasons": [
+    "the order value 7.583627521739 USDT is below the minimum notional 50 USDT for BTCUSDT"
+  ],
+  "duplicate": false,
+  "already_closed": false,
+  "position": null
+}

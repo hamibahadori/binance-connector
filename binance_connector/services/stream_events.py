@@ -70,6 +70,9 @@ class UserDataEventHandler:
             return
         position, role = found
         status = algo_order["X"]
+        current = position.executions.get(role)
+        if current is not None and _algo_rank(status) < _algo_rank(current.status):
+            return  # a late update (the fill can arrive first): never move the leg backwards
         updates: dict[str, Any] = {"status": status, "binance_id": algo_order.get("aid")}
         filled_quantity = Decimal(algo_order.get("aq") or "0")
         if status == "FINISHED" and filled_quantity > 0:
@@ -125,3 +128,11 @@ def _positive_or_none(raw_value) -> Decimal | None:
     if raw_value is None or Decimal(raw_value) == 0:
         return None
     return Decimal(raw_value)
+
+
+ALGO_STATUS_ORDER = {"PENDING": 0, "SUBMITTED": 0, "NEW": 1, "TRIGGERING": 2, "TRIGGERED": 3}
+"""An algo order moves NEW → TRIGGERING → TRIGGERED → a final status; anything else is final."""
+
+
+def _algo_rank(status: str) -> int:
+    return ALGO_STATUS_ORDER.get(status, 4)

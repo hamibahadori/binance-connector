@@ -1,0 +1,257 @@
+# Database structure
+
+The service keeps everything in one SQL database (spec §10), shared by its two processes:
+the **API** (intake and reads) and the **worker** (execution, streams, reports, WebSocket).
+The default is SQLite (`DATABASE_URL=sqlite:///binance_connector.db`) in WAL mode, which
+lets the API read while the worker writes. The models are SQLAlchemy 2 and the schema is
+managed by Alembic (`binance_connector/persistence/migrations`).
+
+```
+alembic upgrade head        # create or upgrade (run once, before starting the processes)
+```
+
+Both processes refuse to start on a schema that is not at the latest migration, so two
+processes never race to migrate the same file.
+
+## Entities and how they connect
+
+```
+accounts 1───* requests                 every request Django sent, OPEN or CLOSE
+    │
+    └──────1───* positions 1───* execution_records   each Binance order of the position
+                     │      1───* position_events     append-only history of the position
+                     │
+reports  ─ ─ ─ ─ ─ ─ ┘   outbox for Django: one row per reported change (request or position)
+error_logs               errors, with the account / request / position they concern
+market_prices            latest mark price per symbol (from the live feed)
+exchange_rules           Binance's trading rules per symbol (cached 24 h)
+```
+
+The spec's entities map onto the tables like this:
+
+| Spec §10 entity | Table(s) |
+|---|---|
+| Users / Accounts | `accounts` (one row per account, carrying its owning `user_id`) |
+| Requests | `requests` |
+| Positions | `positions` |
+| Position Events | `position_events` |
+| Execution Records | `execution_records` |
+| Reports | `reports` |
+| Error Logs | `error_logs` |
+
+Users have no table of their own: Django owns users, and an account belongs to exactly one
+user. A request naming an account with a different `user_id` is rejected.
+
+## Conventions
+
+- **Times** are stored in UTC and returned as ISO 8601 with `+00:00`.
+- **Decimals** (prices, quantities, P&L, fees) are stored as exact decimal strings, never
+  floats, so nothing is rounded on the way in or out.
+- **`version`** columns are optimistic-locking counters. A write that raced another one is
+  retried from fresh data rather than overwriting it.
+- **Secrets.** API keys and secrets are stored only Fernet-encrypted, with the key from
+  `CREDENTIALS_ENCRYPTION_KEY`. Every free-text column that can carry outside text masks
+  every known credential with `***` on write. Those columns are error messages, request
+  payloads, report bodies, event details and error-log messages. This is enforced in the
+  model layer itself, so no code path can bypass it. It is checked by
+  `tests/functional/test_secret_audit.py`.
+
+## Tables
+
+### `accounts`
+
+One row per trading account Django sends requests for.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | integer | primary key |
+| account_id | string(64) | **unique**; Django's account id |
+| user_id | string(64) | the owning user; fixed once the account exists |
+| api_key_encrypted | text | Fernet token of the API key |
+| api_secret_encrypted | text | Fernet token of the secret |
+| api_key_fingerprint | string(12) | SHA-256 prefix of the API key. It detects changed credentials without decrypting them |
+| credentials_updated_at | datetime | when Django last sent different credentials |
+| created_at, updated_at | datetime | |
+| version | integer | optimistic lock |
+
+The latest credentials sent with a request replace the stored ones (decision I).
+
+### `requests`
+
+Every request Django sent, whatever happened to it.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | integer | primary key |
+| request_id | string(64) | **unique across all accounts**; Django's id |
+| account_id | string(64) | → `accounts.account_id` |
+| user_id | string(64) | as sent |
+| action | string(10) | `OPEN` or `CLOSE` |
+| status | string(15) | `RECEIVED → VALIDATING → ACCEPTED \| REJECTED` |
+| processing_state | string(15) | for ACCEPTED requests: `PENDING → IN_PROGRESS → DONE` (the worker's queue) |
+| payload | text (JSON) | the body as received, **without** `api_key` / `secret_key` |
+| payload_hash | string(64) | SHA-256 of the normalised body without credentials. It tells a repeat from a conflicting reuse of the id |
+| rejection_reasons | text (JSON list) | why it was rejected |
+| position_id | string(24) | the position it opened or closes |
+| requested_at | datetime | Django's `timestamp` |
+| received_at, decided_at, processed_at | datetime | intake, the accept or reject decision, execution done |
+| response | text (JSON) | the receipt returned to Django (replayed for duplicates) |
+| version | integer | optimistic lock |
+
+### `positions`
+
+One row per position. A position is created by an accepted OPEN.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | integer | primary key |
+| position_id | string(24) | **unique**; 24 hex characters, generated by the service |
+| account_id | string(64) | → `accounts.account_id` |
+| symbol | string(20) | e.g. `BTCUSDT` |
+| active_symbol | string(20) | equals `symbol` while the position is active, NULL once CLOSED or FAILED |
+| direction | string(5) | `LONG` / `SHORT` |
+| quantity_type | string(10) | `BASE`, `NOTIONAL` or `MARGIN`, as requested |
+| requested_quantity | decimal | as requested, in that unit |
+| quantity | decimal | the order quantity in coins, after conversion and step-size rounding |
+| leverage | integer | NULL = the account's current setting |
+| entry_type | string(10) | `MARKET` or `LIMIT` |
+| entry_price | decimal | LIMIT: the limit price. MARKET: Django's reference price (for slippage and the price guard) |
+| take_profit_price, stop_loss_price | decimal | trigger prices |
+| state | string(10) | see below |
+| close_reason | string(20) | `CLOSE_REQUESTED`, `TAKE_PROFIT`, `STOP_LOSS`, `EXTERNAL` |
+| last_error | text | the latest problem, for people (secrets masked) |
+| open_request_id, close_request_id | string(64) | the requests that opened and closed it |
+| entry_average_price, entry_filled_quantity | decimal | the entry's fill |
+| opened_at | datetime | first fill |
+| exit_average_price | decimal | the close's fill (our exit order, or the TP/SL) |
+| closed_at | datetime | |
+| realized_pnl | decimal | gross: (exit − entry) × quantity, signed by direction |
+| fees | decimal | the sum of Binance's commissions on every fill of the position |
+| created_at, updated_at | datetime | |
+| version | integer | optimistic lock |
+
+**UNIQUE (account_id, active_symbol)** enforces *one active position per symbol per
+account* in the database itself, even with two requests racing each other. Different
+accounts can hold the same symbol at once.
+
+Position states:
+
+```
+OPENING → OPEN → CLOSING → CLOSED
+   │        │        │
+   ├→ FAILED ←───────┤      FAILED: the entry never executed (terminal)
+   └→ ERROR ←────────┘      ERROR: a live position needs attention (recoverable)
+```
+
+| State | Meaning |
+|---|---|
+| OPENING | the entry is being placed, or a LIMIT entry waits for its fill |
+| OPEN | the position is held; TP/SL status is in `execution_records` |
+| CLOSING | a close is being executed |
+| CLOSED | gone; `close_reason` says why (terminal) |
+| FAILED | nothing was ever held: the entry was rejected, or a limit entry expired or was cancelled unfilled (terminal) |
+| ERROR | the outcome of a step is unknown, or protection failed. Reconciliation moves it on once Binance's real state is known |
+
+### `execution_records`
+
+One row per Binance order of a position. Each row is written **before** the order is sent,
+so a restart never sends it twice.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | integer | primary key |
+| position_id | string(24) | → `positions.position_id` |
+| role | string(12) | `e` entry, `x` exit, `tp` take-profit, `sl` stop-loss; **unique per position** |
+| kind | string(5) | `ORDER` (regular) or `ALGO` (conditional TP/SL) |
+| client_id | string(36) | **unique**; `lx-<position_id>-<role>`, the id Binance knows the order by |
+| binance_id | bigint | Binance's orderId / algoId |
+| order_type | string(20) | `MARKET`, `LIMIT`, `TAKE_PROFIT_MARKET`, `STOP_MARKET` |
+| side | string(4) | `BUY` / `SELL` |
+| status | string(20) | `PENDING`, then `SUBMITTED` before sending, then Binance's status (`NEW`, `FILLED`, `CANCELED`, `EXPIRED`, `TRIGGERED`, `FINISHED`, `REJECTED`, …) |
+| price | decimal | limit or trigger price |
+| quantity, executed_quantity, average_price | decimal | |
+| commission, commission_asset | decimal, string | from Binance's trade list |
+| submitted_at, updated_at | datetime | |
+| last_error | text | secrets masked |
+| version | integer | optimistic lock |
+
+### `position_events`
+
+Append-only: every change of a position is one row, in the same transaction as the change.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | integer | primary key, in order |
+| position_id | string(24) | → `positions.position_id` |
+| occurred_at | datetime | |
+| kind | string(30) | `STATE_CHANGED`, `FIELDS_UPDATED`, `EXECUTION_UPDATED` |
+| from_state, to_state | string(10) | for `STATE_CHANGED` |
+| detail | text (JSON) | what changed, e.g. the Binance event that caused it (secrets masked) |
+
+### `reports`
+
+The outbox of reports for Django. A report is written **in the same transaction** as the
+change it reports, so a crash can never lose one. The worker delivers them and the WebSocket
+publishes them. Payloads are described in [api-contract.md](api-contract.md#reports-to-django).
+
+| Column | Type | Notes |
+|---|---|---|
+| id | integer | primary key; the `report_sequence` the WebSocket uses |
+| report_id | string(36) | **unique** UUID; Django drops repeats by it |
+| account_id, request_id, position_id | string | what it concerns |
+| event_type | string(30) | e.g. `REQUEST_ACCEPTED`, `POSITION_OPEN`, `PROTECTION_UPDATED`, `POSITION_CLOSED`, `CLOSE_FAILED` |
+| payload | text (JSON) | the exact body POSTed to Django |
+| status | string(10) | `PENDING → SENT`, or `FAILED` after `DJANGO_REPORT_MAX_ATTEMPTS` |
+| attempts | integer | delivery attempts so far |
+| next_attempt_at | datetime | backoff: 5 s, doubling, capped at 5 min |
+| last_error | text | the last delivery failure |
+| created_at, sent_at | datetime | |
+
+### `error_logs`
+
+Errors worth a person's attention, with the ids they concern (spec §10). Messages and
+context are redacted before storage.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | integer | primary key |
+| occurred_at | datetime | |
+| component | string(40) | e.g. `position_manager`, `execution_manager`, `reconciliation`, `reporting_service` |
+| message | text | |
+| context | text (JSON) | |
+| account_id, request_id, position_id | string | when known |
+
+### `market_prices`
+
+| Column | Type | Notes |
+|---|---|---|
+| symbol | string(20) | primary key |
+| mark_price | decimal | the latest mark price from the live feed (or the REST fallback) |
+| event_time | datetime | Binance's time for that price |
+| updated_at | datetime | when it was stored |
+
+### `exchange_rules`
+
+Binance's trading rules per symbol, refreshed from `exchangeInfo` every 24 h.
+
+| Column | Type | Notes |
+|---|---|---|
+| symbol | string(20) | primary key |
+| tick_size | decimal | price step |
+| step_size, min_quantity | decimal | LOT_SIZE (limit orders) |
+| market_step_size, market_min_quantity, market_max_quantity | decimal | MARKET_LOT_SIZE |
+| min_notional | decimal | minimum order value in USDT |
+| fetched_at | datetime | |
+
+## Recovery after a restart
+
+Everything needed to continue is in the database:
+
+- **Requests** accepted but not yet executed are `PENDING`, and the worker runs them when it
+  starts. One that was `IN_PROGRESS` during a crash is run again. Its orders were recorded
+  as `SUBMITTED` before sending, so they are looked up on Binance by `client_id`, never
+  resent.
+- **Positions** are reconciled with Binance as soon as each account's stream connects. The
+  position, the orders and the TP/SL are each compared with what Binance holds, by client id.
+- **Reports** still `PENDING` are delivered.
+- **WebSocket** clients reconnect and get a fresh `snapshot`.

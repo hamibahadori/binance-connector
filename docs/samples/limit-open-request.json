@@ -1,0 +1,14 @@
+{
+  "request_id": "e2e-1794009563-limit-open",
+  "user_id": "e2e-user-1",
+  "account_id": "e2e-account-1",
+  "api_key": "<demo-api-key>",
+  "secret_key": "<demo-api-secret>",
+  "action": "OPEN",
+  "timestamp": 1794009586087,
+  "symbol": "BTCUSDT",
+  "direction": "LONG",
+  "quantity": "0.002",
+  "entry_type": "LIMIT",
+  "entry_price": "68252.6"
+}

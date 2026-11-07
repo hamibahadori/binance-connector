@@ -5,6 +5,7 @@ from decimal import Decimal
 import pytest
 
 from binance_connector.domain.lifecycle import ExecutionRole, PositionState
+from binance_connector.domain.sizing import plain
 from binance_connector.errors import BinanceAPIError, BinanceUnavailableError, BinanceUnknownOutcomeError
 from binance_connector.services.position_manager import PositionManager
 from tests.fakes import FakeBinance
@@ -61,7 +62,7 @@ def test_an_open_position_reports_its_entry_commission_as_fees_so_far(manager, p
 
     entry_commission = Decimal("0.002") * Decimal("78000.0") * Decimal("0.0004")
     assert position.commissions_so_far == entry_commission
-    assert position_view(position, user_id="user-1")["pnl"]["fees"] == format(entry_commission, "f")
+    assert position_view(position, user_id="user-1")["pnl"]["fees"] == plain(entry_commission)
 
 
 def test_the_stop_loss_goes_first_and_protection_closes_the_whole_position(manager, positions, clients):

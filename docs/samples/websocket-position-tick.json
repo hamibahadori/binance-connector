@@ -1,0 +1,41 @@
+{
+  "type": "position_tick",
+  "sent_at": "2026-11-06T23:59:38.210968+00:00",
+  "data": {
+    "position_id": "5c322d1bb59a49dbba8a9b84",
+    "account_id": "e2e-account-1",
+    "user_id": "e2e-user-1",
+    "symbol": "BTCUSDT",
+    "direction": "LONG",
+    "state": "OPEN",
+    "prices": {
+      "entry": "75820.6",
+      "current": "75846.84057646",
+      "current_at": "2026-11-06T23:59:38+00:00",
+      "exit": null
+    },
+    "pnl": {
+      "kind": "UNREALIZED",
+      "gross": "0.05248115292",
+      "fees": "0.06065648",
+      "net": "-0.00817532708"
+    },
+    "take_profit": {
+      "price": "78122.2",
+      "status": "NEW",
+      "distance": {
+        "absolute": "2275.35942354",
+        "percent": "2.9999"
+      }
+    },
+    "stop_loss": {
+      "price": "73571.4",
+      "status": "NEW",
+      "distance": {
+        "absolute": "2275.44057646",
+        "percent": "3"
+      }
+    },
+    "updated_at": "2026-11-06T23:59:38+00:00"
+  }
+}

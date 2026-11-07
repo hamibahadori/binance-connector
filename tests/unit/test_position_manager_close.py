@@ -7,11 +7,19 @@ import pytest
 
 from binance_connector.domain.lifecycle import CloseReason, ExecutionRole, PositionState
 from binance_connector.errors import BinanceAPIError, BinanceUnknownOutcomeError
+from binance_connector.persistence.positions import PositionRepository
+from binance_connector.persistence.reports import ReportOutbox, ReportRepository
 from binance_connector.persistence.writes import utc_now
 from binance_connector.services.position_manager import PositionManager
 from tests.unit.test_position_manager_open import POSITION_ID, binance, store
 
 CLOSE_REQUEST = "request-close-1"
+
+
+@pytest.fixture
+def positions(session_factory, accounts) -> PositionRepository:
+    """Positions that also write their reports, so the report for Django can be checked."""
+    return PositionRepository(session_factory, outbox=ReportOutbox())
 
 
 @pytest.fixture
@@ -195,3 +203,34 @@ def test_a_partly_filled_limit_entry_at_expiry_keeps_the_fill_and_is_protected(p
     assert position.state is PositionState.OPEN
     assert position.entry_filled_quantity == Decimal("0.001")
     assert position.executions[ExecutionRole.STOP_LOSS].status == "NEW"
+
+
+# --- closed by its take-profit or stop-loss -----------------------------------------------------
+
+
+@pytest.mark.parametrize("status_when_filled", ["NEW", "TRIGGERING", "TRIGGERED"])
+def test_the_leg_that_closed_the_position_is_recorded_as_finished(manager, positions, open_position,
+                                                                  status_when_filled):
+    """Found on Demo: the fill closes the position before Binance's FINISHED event for the
+    algo order, which then never arrives (the account's stream stops once nothing is open)."""
+    positions.update_execution(POSITION_ID, ExecutionRole.TAKE_PROFIT, status=status_when_filled)
+
+    closed = manager.close_by_protection(POSITION_ID, ExecutionRole.TAKE_PROFIT,
+                                         exit_average_price=Decimal("82000"), closed_at=utc_now())
+
+    assert (closed.state, closed.close_reason) == (PositionState.CLOSED, CloseReason.TAKE_PROFIT)
+    assert closed.executions[ExecutionRole.TAKE_PROFIT].status == "FINISHED"
+
+
+def test_the_final_report_shows_the_leg_finished(manager, session_factory, open_position):
+    import json
+
+    manager.close_by_protection(POSITION_ID, ExecutionRole.STOP_LOSS, exit_average_price=Decimal("74000"),
+                                closed_at=utc_now())
+
+    closed_report = [report for report in ReportRepository(session_factory).all()
+                     if report.event_type == "POSITION_CLOSED"][-1]
+    body = json.loads(closed_report.payload)
+    assert body["stop_loss"]["status"] == "FINISHED"
+    # the other leg is removed before the close is recorded (found on Demo: it read NEW)
+    assert body["take_profit"]["status"] in ("CANCELED", "EXPIRED")

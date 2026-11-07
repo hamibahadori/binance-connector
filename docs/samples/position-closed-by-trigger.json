@@ -1,0 +1,59 @@
+{
+  "position_id": "6e466b3a531a4a50af5ad9bf",
+  "request_id": "e2e-1794009563-trigger-open",
+  "close_request_id": null,
+  "user_id": "e2e-user-1",
+  "account_id": "e2e-account-1",
+  "symbol": "BTCUSDT",
+  "direction": "LONG",
+  "state": "CLOSED",
+  "leverage": null,
+  "quantity": {
+    "requested": "0.002",
+    "type": "BASE",
+    "ordered": "0.002",
+    "filled": "0.002"
+  },
+  "entry": {
+    "type": "MARKET",
+    "requested_price": null,
+    "average_price": "75815.2",
+    "slippage": null
+  },
+  "times": {
+    "received": "2026-11-07T00:00:21.104171+00:00",
+    "started": "2026-11-07T00:00:23.250075+00:00",
+    "ended": "2026-11-07T00:01:57.072000+00:00",
+    "updated": "2026-11-07T00:01:58.767501+00:00"
+  },
+  "prices": {
+    "entry": "75815.2",
+    "current": "75875.97603261",
+    "current_at": "2026-11-07T00:01:59+00:00",
+    "exit": "75815"
+  },
+  "pnl": {
+    "kind": "REALIZED",
+    "gross": "-0.0004",
+    "fees": "0.12130416",
+    "net": "-0.12170416"
+  },
+  "take_profit": {
+    "price": "75857.3",
+    "status": "FINISHED",
+    "distance": {
+      "absolute": "18.67603261",
+      "percent": "0.0246"
+    }
+  },
+  "stop_loss": {
+    "price": "75781.4",
+    "status": "EXPIRED",
+    "distance": {
+      "absolute": "94.57603261",
+      "percent": "0.1246"
+    }
+  },
+  "close_reason": "TAKE_PROFIT",
+  "error": null
+}

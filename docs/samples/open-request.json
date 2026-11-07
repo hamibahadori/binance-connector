@@ -1,0 +1,16 @@
+{
+  "request_id": "e2e-1794009563-lifecycle-open",
+  "user_id": "e2e-user-1",
+  "account_id": "e2e-account-1",
+  "api_key": "<demo-api-key>",
+  "secret_key": "<demo-api-secret>",
+  "action": "OPEN",
+  "timestamp": 1794009570895,
+  "symbol": "BTCUSDT",
+  "direction": "LONG",
+  "quantity": "0.002",
+  "leverage": 5,
+  "entry_price": "75846.8",
+  "take_profit_price": "78122.2",
+  "stop_loss_price": "73571.4"
+}

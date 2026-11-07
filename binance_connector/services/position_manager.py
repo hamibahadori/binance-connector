@@ -402,6 +402,7 @@ class PositionManager:
         """
         reason = CloseReason.TAKE_PROFIT if role is ExecutionRole.TAKE_PROFIT else CloseReason.STOP_LOSS
         position = self._positions.get(position_id)
+        self._mark_finished(position, role)
         if position.state is PositionState.CLOSED:
             if position.close_reason is CloseReason.EXTERNAL:
                 return self._positions.update_fields(
@@ -411,11 +412,25 @@ class PositionManager:
                     realized_pnl=_realized(position, exit_average_price), last_error=None,
                 )
             return position
+        # Remove the other leg first (as a CLOSE does), so the POSITION_CLOSED report shows
+        # both legs' final status; on Demo the other leg read NEW in it otherwise.
+        self.cancel_protection(position_id)
         closed = self.finish_closed(position_id, reason, exit_average_price=exit_average_price, closed_at=closed_at)
         if closed.state is PositionState.CLOSED and closed.close_reason is reason:
             logger.info("Position %s closed by its %s at %s", position_id, reason.value, exit_average_price)
-            self.cancel_protection(position_id)
         return self._positions.get(position_id)
+
+    def _mark_finished(self, position: Position, role: ExecutionRole) -> None:
+        """Record the leg that filled as FINISHED, before the close is recorded.
+
+        Its fill proves it executed. Binance's own FINISHED event for the algo order comes
+        after the fill and can be missed: on Demo (2026-11-07) the position closed while the
+        leg still read TRIGGERING, and the account's stream stopped once nothing was open.
+        """
+        execution = position.executions.get(role)
+        if execution is not None and execution.status != "FINISHED":
+            self._positions.update_execution(position.position_id, role, status="FINISHED",
+                                             event_detail={"reason": "its fill closed the position"})
 
     def apply_entry_fill(self, position_id: str, *, executed_quantity: Decimal, average_price: Decimal | None,
                          filled_at: datetime) -> Position:

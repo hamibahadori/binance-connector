@@ -1,0 +1,10 @@
+{
+  "request_id": "e2e-1794009563-lifecycle-close",
+  "user_id": "e2e-user-1",
+  "account_id": "e2e-account-1",
+  "api_key": "<demo-api-key>",
+  "secret_key": "<demo-api-secret>",
+  "action": "CLOSE",
+  "timestamp": 1794009578714,
+  "position_id": "5c322d1bb59a49dbba8a9b84"
+}
