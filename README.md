@@ -167,3 +167,7 @@ The latest results, mapped to the spec's acceptance criteria, are in
   holds even while the service is down (see the contract's TP/SL section).
 - **Fees** are Binance's reported commissions, and P&L is reported gross, fees and net.
   Funding payments are not included.
+
+## License
+
+[MIT](LICENSE)

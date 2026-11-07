@@ -13,7 +13,7 @@ WORKDIR /app
 
 # Dependencies and the package. The source stays in /app too: alembic.ini points at the
 # migrations folder by path.
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md LICENSE ./
 COPY binance_connector ./binance_connector
 RUN pip install . && rm -rf build *.egg-info
 COPY alembic.ini ./

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=75"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,6 +7,8 @@ name = "binance-connector"
 version = "0.1.0"
 description = "Strategy execution service: runs Django's trade requests on Binance USD-M futures Demo, per user account, and reports every step back."
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.13"
 dependencies = [
     "flask>=3.1,<4",
